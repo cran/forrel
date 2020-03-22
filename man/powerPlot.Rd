@@ -8,6 +8,8 @@ powerPlot(
   ep,
   ip,
   type = 1,
+  majorpoints = TRUE,
+  minorpoints = TRUE,
   ellipse = FALSE,
   col = NULL,
   labs = NULL,
@@ -19,8 +21,7 @@ powerPlot(
   xlim = NULL,
   ylim = NULL,
   xlab = NULL,
-  ylab = NULL,
-  legendOrder = NULL
+  ylab = NULL
 )
 }
 \arguments{
@@ -30,6 +31,12 @@ powerPlot(
 NULL. See Examples.}
 
 \item{type}{Plot type; either 1, 2, 3 or 4.}
+
+\item{majorpoints}{A logical indicating whether "major" points should be
+drawn (see Details).}
+
+\item{minorpoints}{A logical indicating whether "minor" points should be
+drawn (see Details).}
 
 \item{ellipse}{A logical. If TRUE, data ellipsis are drawn for each group
 containing more than 1 element. NB: This fails with a warning if all points
@@ -48,14 +55,12 @@ in a group fall on a line.}
 \item{size}{Point size.}
 
 \item{hline, vline}{Single numbers indicating positions for
-horizontal/vertical "threshold" lines. When \code{type = 1}, these determine the
-shaded vertical regions, by default starting at 0.95.}
+horizontal/vertical "threshold" lines. If NULL (default), no lines are
+drawn.}
 
 \item{xlim, ylim}{Axis limits; automatically chosen if NULL.}
 
 \item{xlab, ylab}{Axis labels; automatically chosen if NULL.}
-
-\item{legendOrder}{A permutation of \verb{1,2,...,L}, where \code{L = length(ep)}.}
 }
 \value{
 A \code{ggplot2} plot object.
@@ -77,21 +82,20 @@ The plot types are as follows:
 
 \code{type = 4}: x = Exclusion power; y = average LR
 
-For each \code{EPresult} object in \code{ep}, and the corresponding element of \code{ip},
-the relevant data is extracted from each, producing a single point the final
-plot.
-
 In the most general case \code{ep} (and similarly for \code{ip}) can be a list of lists
-of \code{EPresult} objects. To simplify the discussion we refer to the inner lists
-as "groups". A group may consist of a single point, or several (typically
-many simulations of the same situation). Points within the same group are
-always drawn with the same colour and shape.
+of \code{EPresult} objects. We refer to the inner lists as "groups". A group may
+consist of a single output, or several (typically many simulations of the
+same situation). Points within the same group are always drawn with the same
+colour and shape.
 
-When plotting several groups, two sets of points are drawn:
+When plotting several groups, two sets of points are drawn by default:
 \itemize{
 \item Major points: Group means.
 \item Minor points: Individual points in groups with more than one element.
 }
+
+The parameters \code{majorpoints} and \code{minorpoints} control which of the above
+points are included.
 }
 \examples{
 
@@ -102,18 +106,19 @@ ref = setMarkers(ref, marker(ref, alleles = 1:5))
 sel = list("fa", c("fa", "mo"))
 
 # Simulate power for each selection
-simData = MPPsims(ref, selections = sel, nProfiles = 5,
-                  lrSims = 10, thresholdIP = 2, seed = 123)
+simData = MPPsims(ref, selections = sel, nProfiles = 3, lrSims = 5,
+                  thresholdIP = 2, seed = 123, numCores = 1)
 
 # Power plot 1: EP vs IP
 powerPlot(simData, type = 1)
+powerPlot(simData, type = 1, minorpoints = FALSE, hline = 0.8)
 
 \donttest{
 
 # Change shape, and modify legend order
-powerPlot(simData, type = 1, shape = c("ci", "sq", "di"), legendOrder = 3:1)
+powerPlot(simData[3:1], type = 1, shape = c("ci", "sq", "di"))
 
-# Zoom in, and adjust the blue strips
+# Zoom in, and add threshold lines
 powerPlot(simData, type = 1, xlim = c(0.4, 1), ylim = c(0.4, 1),
           hline = 0.8, vline = 0.8)
 

@@ -9,30 +9,33 @@
 #' @param selections A list of pedigree member subsets. In the special case that
 #'   all subsets consist of a single individual, `selections` can be given as a
 #'   simple vector.
+#' @param ep A logical: Estimate the exclusion power? (Default: TRUE)
+#' @param ip A logical: Estimate the inclusion power? (Default: TRUE)
 #' @param addBaseline A logical. If TRUE (default) an *empty* selection, named
 #'   "Baseline", is added as the first element of `selection`.
 #' @param nProfiles The number of profile simulations for each selection.
-#' @param lrSims,thresholdIP Parameters passed onto [missingPersonIP()]
+#' @param lrSims,thresholdIP Parameters passed onto [missingPersonIP()].
+#' @param numCores The number of cores used in the parallelisation setup.
 #'
 #' @return An object of class "MPPsim", which is basically a list with one entry
 #'   for each element of `selections`. Each entry has elements `ep` and `ip`,
 #'   each of which is a list of length `nProfiles`.
 #'
 #'   The output object has various attributes reflecting the input. Note that
-#'   `reference` and `selection` may differ slightly from the original input, since they
-#'   may be modified during the function run. (For instance, a "Baseline" entry
-#'   is added to `selection` if `addBaseline` is TRUE.) The crucial point is
-#'   that the output attributes correspond exactly to the output data.
+#'   `reference` and `selection` may differ slightly from the original input,
+#'   since they may be modified during the function run. (For instance, a
+#'   "Baseline" entry is added to `selection` if `addBaseline` is TRUE.) The
+#'   crucial point is that the output attributes correspond exactly to the
+#'   output data.
 #'
-#'   * `reference` (always a list, of the same length as the `selections` attribute
+#'   * `reference` (always a list, of the same length as the `selections`
+#'   attribute
 #'
 #'   * `selections`
 #'
 #'   * `nProfiles`,`lrSims`,`thresholdIP`,`seed` (as in the input)
 #'
 #'   * `totalTime` (the total time used)
-#'
-#' @export
 #'
 #' @examples
 #' x = nuclearPed(fa = "Gf", mo = "Gm", children = c("Uncle", "Mother"), sex = 1:2)
@@ -50,7 +53,7 @@
 #' plot(x, marker = 1, shaded = sel)
 #'
 #' # Simulate
-#' simData = MPPsims(x, selections = sel, nProfiles = 2, lrSims = 2)
+#' simData = MPPsims(x, selections = sel, nProfiles = 2, lrSims = 2, numCores = 1)
 #'
 #' # Power plot
 #' powerPlot(simData, type = 3)
@@ -88,9 +91,13 @@
 #' pows = MPPsims(peds, selections = sel, addBaseline = FALSE, lrSims = 10)
 #' powerPlot(pows, type = 3)
 #' }
-MPPsims = function(reference, missing = "MP", selections, addBaseline = TRUE,
-                   nProfiles = 1, lrSims = 1, thresholdIP = NULL,
-                   disableMutations = NA, seed = NULL, verbose = TRUE) {
+#'
+#' @importFrom parallel makeCluster stopCluster detectCores parLapply
+#'   clusterEvalQ clusterExport clusterSetRNGStream
+#' @export
+MPPsims = function(reference, missing = "MP", selections, ep = TRUE, ip = TRUE,
+                   addBaseline = TRUE, nProfiles = 1, lrSims = 1, thresholdIP = NULL,
+                   disableMutations = NA, numCores = NA, seed = NULL, verbose = TRUE) {
   st = Sys.time()
 
   if(!is.list(selections))
@@ -123,6 +130,21 @@ MPPsims = function(reference, missing = "MP", selections, addBaseline = TRUE,
 
   set.seed(seed)
 
+  # Setup parallelisation
+  if(is.na(numCores))
+    numCores = detectCores() - 1
+  if(numCores > 1) {
+    cl = makeCluster(numCores)
+    on.exit(stopCluster(cl))
+    if(verbose) {
+      message("Preparing parallelisation... ", appendLF = FALSE)
+      print(cl)
+    }
+    clusterEvalQ(cl, library(forrel))
+    clusterExport(cl, c("missingPersonEP", "missingPersonIP", "lrSims", "thresholdIP"), envir = environment())
+    clusterSetRNGStream(cl, iseed = sample.int(1e6,1))
+  }
+
   powSims = lapply(seq_along(selections), function(i) {
     ref = reference[[i]]
     ids = selections[[i]]
@@ -132,18 +154,25 @@ MPPsims = function(reference, missing = "MP", selections, addBaseline = TRUE,
 
     # Baseline
     if(is.null(ids)) {
-      ep0 = epfun(ref)
-      ip0 = ipfun(ref)
+      ep0 = if(ep) epfun(ref) else NULL
+      ip0 = if(ip) ipfun(ref) else NULL
       return(list(ep = ep0, ip = ip0))
     }
 
     # Simulate profile for `ids`
     sims = profileSim(ref, ids = ids, N = nProfiles)
 
+
     # Compute updated EP and IP for each profile
-    ep = lapply(sims, epfun)
-    ip = lapply(sims, ipfun)
-    list(ep = ep, ip = ip)
+    if(numCores == 1) {
+      epRes = if(ep) lapply(sims, epfun) else NULL
+      ipRes = if(ip) lapply(sims, ipfun) else NULL
+    }
+    else {
+      epRes = if(ep) parLapply(cl, sims, epfun) else NULL
+      ipRes = if(ip) parLapply(cl, sims, ipfun) else NULL
+    }
+    list(ep = epRes, ip = ipRes)
   })
 
   names(powSims) = names(selections)
@@ -159,3 +188,17 @@ MPPsims = function(reference, missing = "MP", selections, addBaseline = TRUE,
             seed = seed, totalTime = totalTime, class = "MPPsim")
 }
 
+
+#' @export
+`[.MPPsim` = function(x, i) {
+  structure(unclass(x)[i],
+            reference = attr(x, 'reference'),
+            selections = attr(x, 'selections')[i],
+            nProfiles = attr(x, 'nProfiles'),
+            lrSims = attr(x, 'lrSims'),
+            thresholdIP = attr(x, 'thresholdIP'),
+            seed = "NA (order changed)",
+            totalTime = attr(x, 'totalTime'),
+            class = "MPPsim")
+
+}
