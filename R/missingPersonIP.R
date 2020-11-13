@@ -75,7 +75,7 @@ missingPersonIP = function(reference, missing, markers, nsim = 1, threshold = NU
   else if(disGOOD) { # disable only if consistent
     refNoMut = reference
     mutmod(refNoMut, markers[hasMut]) = NULL
-    liksNoMut = vapply(markers[hasMut], function(i) pedprobr::likelihood(refNoMut, i), 0)
+    liksNoMut = likelihood(refNoMut, markers[hasMut])
     disable = markers[hasMut][liksNoMut > 0]
   }
   else if(disSELECT)
@@ -97,7 +97,7 @@ missingPersonIP = function(reference, missing, markers, nsim = 1, threshold = NU
   unrelatedPed = list(reference, singleton(poiLabel, sex = getSex(reference, missing)))
 
   # Raise error if impossible markers
-  liks = sapply(midx, function(i) pedprobr::likelihood(reference, i))
+  liks = likelihood(reference, midx)
   if(any(liks == 0))
     stop2("Marker incompatible with reference pedigree: ", markers[liks == 0],
           "\nThis makes conditional simulations impossible. Exclude the marker from the computation or add a mutation model")
@@ -109,7 +109,7 @@ missingPersonIP = function(reference, missing, markers, nsim = 1, threshold = NU
   if(verbose)
     message("Simulating ", nsim, " profiles...", appendLF = FALSE)
 
-  allsims = profileSim(relatedPed, ids = "_POI_", N = nsim, markers = midx)
+  allsims = profileSim(relatedPed, ids = "_POI_", N = nsim, markers = midx, verbose = FALSE)
 
   if(verbose)
     message("done\nComputing likelihood ratios...", appendLF = FALSE)
@@ -144,24 +144,14 @@ missingPersonIP = function(reference, missing, markers, nsim = 1, threshold = NU
   if(verbose)
     message("Total time used: ", format(time, digits = 3))
 
-  # Lits of input parameters
+  # List of input parameters
   params = list(missing = missing, markers = markers,
                 nsim = nsim, threshold = threshold, seed = seed,
                 disableMutations = disableMutations)
 
   structure(list(LRperSim = LRperSim, meanLRperMarker = meanLRperMarker,
                  meanLR = meanLR, meanLogLR = meanLogLR, IP = IP,
-                 time = time, params = params), class = "mpIP")
-}
-
-#' @export
-print.mpIP = function(x, ...) {
-  cat("Mean total LR:", round(x$meanLR, 3), "\n")
-  cat("Mean total log10(LR):", round(x$meanLogLR, 3), "\n")
-  ip = x$IP
-  cat("Estimated inclusion powers:", if(!length(ip)) NA, "\n")
-  for(i in seq_along(ip))
-    cat(sprintf("  P(LR > %s) = %.3g\n", names(ip)[i], ip[i]))
+                 time = time, params = params), class = "LRpowerResult")
 }
 
 

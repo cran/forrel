@@ -46,6 +46,7 @@
 #' @param col A colour vector, recycle to match the top level length of `ep`.
 #' @param labs A character of the same length as `ep`. If NULL, the names of
 #'   `ep` are used, if present.
+#' @param stroke Border width for major points (see Details).
 #' @param alpha Transparency for minor points (see Details).
 #' @param shape Either "circle", "square", "diamond", "triangleUp" or
 #'   "triangleDown", determining the shapes of both minor and major points.
@@ -81,7 +82,7 @@
 #' powerPlot(simData[3:1], type = 1, shape = c("ci", "sq", "di"))
 #'
 #' # Zoom in, and add threshold lines
-#' powerPlot(simData, type = 1, xlim = c(0.4, 1), ylim = c(0.4, 1),
+#' powerPlot(simData, type = 1, xlim = c(0.2, 1), ylim = c(0.5, 1),
 #'           hline = 0.8, vline = 0.8)
 #'
 #' # Power plot 3: Expected number of exclusions vs E[log LR]
@@ -97,14 +98,25 @@
 #'
 #' @importFrom stats aggregate
 #' @export
-powerPlot = function(ep, ip, type = 1, majorpoints = TRUE, minorpoints = TRUE,
-                     ellipse = FALSE, col = NULL, labs = NULL, alpha = 1,
-                     shape = "circle", size = 2, hline = NULL, vline = NULL,
+powerPlot = function(ep, ip = NULL, type = 1, majorpoints = TRUE, minorpoints = TRUE,
+                     ellipse = FALSE, col = NULL, labs = NULL, alpha = 1, stroke = 1.5,
+                     shape = "circle", size = 1, hline = NULL, vline = NULL,
                      xlim = NULL, ylim = NULL, xlab = NULL, ylab = NULL) {
   if(!requireNamespace("ggplot2", quietly = TRUE))
     stop2("Package `ggplot2` is not installed. Please install this and try again.")
 
+  # TODO: simplify
   if(inherits(ep, "MPPsim")) {
+    if(all(c("ep","ip") %in% names(ep))) {
+      ip = ep$ip
+      ep = ep$ep
+    }
+    else {
+      ip = lapply(ep, "[[", "ip")
+      ep = lapply(ep, "[[", "ep")
+    }
+  }
+  if(inherits(ep, "MPPsim2")) {
     ip = lapply(ep, "[[", "ip")
     ep = lapply(ep, "[[", "ep")
   }
@@ -129,13 +141,14 @@ powerPlot = function(ep, ip, type = 1, majorpoints = TRUE, minorpoints = TRUE,
     stop2("Arguments `ep` and `ip` are incompatible")
 
   ### Group labels legend ordering
+  nolegend = is.null(labs) && L == 1
   if(is.null(labs))
     labs = seq_along(L)
   group = factor(rep(labs, times = L), levels = labs)
 
-  ### COlours
+  ### Colours
   if(is.null(col)) {
-    col = c("lightgreen", "firebrick1", "deepskyblue", "#FFFF33", "gray70", "#F781BF", "cyan", "wheat", "#FF7F00")
+    col = c("lightgreen", "firebrick1", "deepskyblue", "#FFFF33", "gray70", "#F781BF", "wheat", "cyan", "#FF7F00")
 
     # Use white for "Baseline", if present
     if(!is.na(baseIdx <- match("Baseline", labs)))
@@ -144,8 +157,19 @@ powerPlot = function(ep, ip, type = 1, majorpoints = TRUE, minorpoints = TRUE,
 
   col = setNames(rep_len(col, length(labs)), labs)
 
-  ### Point shapes of minor and major points
+  ### Point sizes
+  if(length(size) == 1)
+    size = c(2*size, size)
+  majorSize = size[1]
+  minorSize = size[2]
 
+  ### Alphas
+  if(length(alpha) == 1)
+    alpha = c(alpha, alpha)
+  majorAlpha = alpha[1]
+  minorAlpha = alpha[2]
+
+  ### Point shapes
   majorShapes = c(circle=21, square=22, diamond=23, triangleUp=24, triangleDown=25)
   minorShapes = c(circle=1, square=0, diamond=5, triangleUp=2, triangleDown=6)
   shapeIdx = pmatch(shape, names(majorShapes), duplicates.ok = TRUE)
@@ -227,13 +251,13 @@ powerPlot = function(ep, ip, type = 1, majorpoints = TRUE, minorpoints = TRUE,
     ggplot2::geom_hline(yintercept = hline, linetype = 2) +
     ggplot2::geom_vline(xintercept = vline, linetype = 2) +
     {if(minorpoints)
-      ggplot2::geom_point(data = minor, ggplot2::aes(colour = group), size = size,
-                        shape = shapeMapMinor[minor$group], alpha = alpha)} +
+      ggplot2::geom_point(data = minor, ggplot2::aes(colour = group), size = minorSize,
+                        shape = shapeMapMinor[minor$group], alpha = minorAlpha)} +
     {if(ellipse)
       ggplot2::stat_ellipse(data = minor, ggplot2::aes(colour = group), na.rm = TRUE)} +
     {if(majorpoints)
       ggplot2::geom_point(data = major, ggplot2::aes(fill = group, shape = group),
-                        size = 2*size, colour = "black", stroke = 1.5)} +
+                        size = majorSize, alpha = majorAlpha, colour = "black", stroke = stroke)} +
     ggplot2::labs(x = xlab, y = ylab, fill = NULL, colour = NULL) +
     ggplot2::scale_colour_manual(values = col) +
     ggplot2::scale_fill_manual(values = col) +
@@ -241,8 +265,8 @@ powerPlot = function(ep, ip, type = 1, majorpoints = TRUE, minorpoints = TRUE,
     ggplot2::scale_x_continuous(limits = xlim) +
     ggplot2::scale_y_continuous(limits = ylim) +
     ggplot2::guides(colour = FALSE,
-                    fill = ggplot2::guide_legend(title = "", reverse = TRUE),
-                    shape = ggplot2::guide_legend(title = "", reverse = TRUE)
+                    fill = if(nolegend) FALSE else ggplot2::guide_legend(title = "", reverse = TRUE),
+                    shape = if(nolegend) FALSE else ggplot2::guide_legend(title = "", reverse = TRUE)
                     ) +
     ggplot2::coord_cartesian(clip = 'off') +
     ggplot2::theme_bw(base_size = 14)

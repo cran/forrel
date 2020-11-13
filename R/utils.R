@@ -5,11 +5,15 @@ stop2 = function(...) {
 }
 
 # Test that input is a single number, with optional range constraints
-is_number = function(x, minimum = NA, maximum = NA) {
+isNumber = function(x, minimum = NA, maximum = NA) {
   isTRUE(length(x) == 1 &&
            is.numeric(x) &&
            (is.na(minimum) || x >= minimum) &&
            (is.na(maximum) || x <= maximum))
+}
+
+`%||%` = function(x, y) {
+  if(is.null(x)) y else x
 }
 
 pluralise = function(noun, n) {
@@ -30,14 +34,24 @@ pluralise = function(noun, n) {
   sample.int(2, size = n, replace = TRUE) - 1L
 }
 
-# Equivalent to t.default(combn(n, 2)), but ~6 times faster.
-.comb2 = function(n) {
+
+# Faster version of t.default(combn(n, 2, simplify = T))
+.comb2 = function(n, vec = length(n) > 1){
+  if(vec) {
+    v = n
+    n = length(v)
+  }
   if (n < 2)
     return(matrix(nrow = 0, ncol = 2))
-  v1 = rep.int(seq_len(n - 1), (n - 1):1)
-  v2 = NULL
-  for (i in 2:n) v2 = c(v2, i:n)
-  cbind(v1, v2, deparse.level = 0)
+
+  x = rep.int(seq_len(n - 1), (n - 1):1)
+  o = c(0, cumsum((n-2):1))
+  y = seq_along(x) + 1 - o[x]
+
+  if(vec)
+    cbind(v[x], v[y], deparse.level = 0)
+  else
+    cbind(x, y, deparse.level = 0)
 }
 
 isEP = function(x) {
@@ -53,14 +67,14 @@ isIP = function(x) {
 consistentMarkers = function(x, markers = seq_len(nMarkers(x))) {
 
   # `marker` may be numeric, character or logical
-  x = selectMarkers(x, markers)
-  nMark = if(is.logical(markers)) sum(markers) else length(markers)
+  y = selectMarkers(x, markers)
+  nMark = nMarkers(y)
 
-  # Compute likelihoods with no mutation model
-  liks = vapply(seq_len(nMark), function(i) {
-    mutmod(x, i) = NULL
-    pedprobr::likelihood(x, i)
-  }, FUN.VALUE = 0)
+  if(!nMark)
+    return(TRUE)
+
+  mutmod(y, 1:nMark) = NULL
+  liks = likelihood(y, 1:nMark)
 
   # Return TRUE if likelihood is nonzero
   liks > 0
@@ -95,4 +109,33 @@ disableMutationModels = function(x, disable, verbose = FALSE) {
 
   # Return the modified object
   x
+}
+
+
+# TODO: Move to pedtools
+fixAllelesAndFreqs = function(alleles = NULL, afreq = NULL,
+                              observed = NULL, NAstrings = c(0, "", NA, "-")) {
+
+  if(!is.null(alleles) && !is.null(names(afreq)))
+    stop2("Argument `alleles` should not be used when `afreq` has names")
+  if(is.null(alleles) && !is.null(afreq) && is.null(names(afreq)))
+    stop2("When `alleles` is NULL, `afreq` must be named")
+
+  # If alleles are NULL, take from afreq names, otherwise from supplied genos
+  als = alleles %||% names(afreq) %||% .mysetdiff(observed, NAstrings)
+  if(length(als) == 0)
+    als = 1:2
+
+  ### Frequencies
+  afreq = afreq %||% {rep_len(1, length(als))/length(als)}
+  names(afreq) = names(afreq) %||% als
+
+  # Sort alleles and frequencies (numerical sorting if appropriate)
+  if (!is.numeric(als) && !anyNA(suppressWarnings(as.numeric(als))))
+    ord = order(as.numeric(als))
+  else
+    ord = order(als)
+
+  # Return ordered, named frequencies
+  afreq[ord]
 }

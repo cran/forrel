@@ -6,7 +6,7 @@
 \usage{
 powerPlot(
   ep,
-  ip,
+  ip = NULL,
   type = 1,
   majorpoints = TRUE,
   minorpoints = TRUE,
@@ -14,8 +14,9 @@ powerPlot(
   col = NULL,
   labs = NULL,
   alpha = 1,
+  stroke = 1.5,
   shape = "circle",
-  size = 2,
+  size = 1,
   hline = NULL,
   vline = NULL,
   xlim = NULL,
@@ -48,6 +49,8 @@ in a group fall on a line.}
 \code{ep} are used, if present.}
 
 \item{alpha}{Transparency for minor points (see Details).}
+
+\item{stroke}{Border width for major points (see Details).}
 
 \item{shape}{Either "circle", "square", "diamond", "triangleUp" or
 "triangleDown", determining the shapes of both minor and major points.}
@@ -119,7 +122,7 @@ powerPlot(simData, type = 1, minorpoints = FALSE, hline = 0.8)
 powerPlot(simData[3:1], type = 1, shape = c("ci", "sq", "di"))
 
 # Zoom in, and add threshold lines
-powerPlot(simData, type = 1, xlim = c(0.4, 1), ylim = c(0.4, 1),
+powerPlot(simData, type = 1, xlim = c(0.2, 1), ylim = c(0.5, 1),
           hline = 0.8, vline = 0.8)
 
 # Power plot 3: Expected number of exclusions vs E[log LR]

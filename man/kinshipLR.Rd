@@ -4,57 +4,87 @@
 \alias{kinshipLR}
 \title{Likelihood ratios for kinship testing}
 \usage{
-kinshipLR(x, ref, markers)
+kinshipLR(..., ref = NULL, source = NULL, markers = NULL, verbose = FALSE)
 }
 \arguments{
-\item{x}{A list of pedigree alternatives. Each alternative should be either a
-single \code{ped} object or a list of such.}
+\item{...}{Pedigree alternatives. Each argument should be either a single
+\code{ped} object or a list of such. The pedigrees may be named; otherwise they
+are assigned names "H1", "H2", ... automatically.
 
-\item{ref}{A single integer, indicating the index (in the list \code{x}) of the
-reference alternative. This is used in the denominator of each LR.}
+It is also possible to pass a single \code{list} containing all the pedigrees.}
 
-\item{markers}{A vector of integers, indexing which markers should be
-included. If NULL (the default) all markers are used.}
+\item{ref}{An index or name indicating which of the input pedigrees should be
+used as "reference pedigree", i.e., used in the denominator of each LR. If
+NULL (the default), the last pedigree is used as reference.}
+
+\item{source}{An index or name designating one of the input pedigrees as
+source for marker data. If given, marker data is transferred from this to
+all the other pedigrees (replacing any existing markers). The default
+action (\code{source = NULL}) is as follows: If all pedigree have attached
+markers, no transfers are done. If exactly one of the pedigrees have
+attached markers, these are transferred to the others. all other cases give
+an error.}
+
+\item{markers}{A vector of marker names or indices indicating which markers
+should be included. If NULL (the default) all markers are used.}
+
+\item{verbose}{A logical.}
 }
 \value{
-A \code{LRresult}object, which is essentially a list with entries
+A \code{LRresult} object, which is essentially a list with entries
 \itemize{
-\item \code{LRtotal} : Total likelihood ratios
-\item \code{LRperMarker} : Likelihood ratios for each marker
-\item \code{likelihoodsPerMarker} : Likelihoods for each marker
-\item \code{time} user system and elapsed time
+\item \code{LRtotal} : A vector of length \code{L}, where \code{L} is the number of input
+pedigrees. The i'th entry is the total LR (i.e., the product over all
+markers) comparing pedigree \code{i} to the reference pedigree. The entry
+corresponding to the reference will always be 1.
+\item \code{LRperMarker} : A numerical matrix, where the i'th column contains the
+marker-wise LR values comparing pedigree \code{i} to the reference. The product
+of all entries in a column should equal the corresponding entry in
+\code{LRtotal}.
+\item \code{likelihoodsPerMarker} : A numerical matrix of the same dimensions as
+\code{LRperMarker}, but where the entries are likelihood of each pedigree for
+each marker.
+\item \code{time} : Elapsed time
 }
 }
 \description{
-This function computes likelihood ratios (LRs) for a given a list of
-pedigrees with attached markers. The user must indicate which of the
-pedigrees is the 'reference', which will be used in the denominator in each
-LR.
+This function computes likelihood ratios (LRs) for a list of pedigrees. One
+of the pedigrees (the last one, by default) is designated as 'reference', to
+be used in the denominator in all LR calculations. To ensure that all
+pedigrees use the same data set, one of the pedigrees may be chosen as
+'source', from which data is transferred to all the other pedigrees.
 }
 \examples{
 
 # Simulate 5 markers for a pair of full sibs
-set.seed(123)
-sibs = nuclearPed(children = c("A", "B"))
-sibs = simpleSim(sibs, N = 5, alleles = 1:4, ids = c("A", "B"))
+ids = c("A", "B")
+sibs = nuclearPed(children = ids)
+sibs = simpleSim(sibs, N = 5, alleles = 1:4, ids = ids, seed = 123)
 
-# Create two alternative hypotheses and transfer the simulated genotypes to them
-halfsibs = relabel(halfSibPed(), old = 4:5, new = c("A", "B"))
-halfsibs = transferMarkers(sibs, halfsibs)
-
+# Create two alternative hypotheses
+halfsibs = relabel(halfSibPed(), old = 4:5, new = ids)
 unrel = list(singleton("A"), singleton("B"))
-unrel = transferMarkers(sibs, unrel)
 
-# Compute LR with 'unrelated' as reference
-res = kinshipLR(list(sibs, halfsibs, unrel), ref = 3)
-res
+# Compute LRs. By default, the last ped is used as reference
+kinshipLR(sibs, halfsibs, unrel)
+
+# Input pedigrees can be named, reflected in the output
+kinshipLR(S = sibs, H = halfsibs, U = unrel)
+
+# Select non-default reference (by index or name)
+kinshipLR(S = sibs, H = halfsibs, U = unrel, ref = "H")
+
+# Alternative syntax: List input
+peds = list(S = sibs, H = halfsibs, U = unrel)
+kinshipLR(peds, ref = "H", source = "S", verbose = TRUE)
 
 # Detailed results
+res = kinshipLR(peds)
 res$LRperMarker
 res$likelihoodsPerMarker
 }
 \seealso{
-\code{\link[=LRpower]{LRpower()}}, \code{\link[pedtools:transferMarkers]{pedtools::transferMarkers()}}
+\code{\link[=LRpower]{LRpower()}}
 }
 \author{
 Magnus Dehli Vigeland and Thore Egeland

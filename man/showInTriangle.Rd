@@ -3,55 +3,7 @@
 \name{showInTriangle}
 \alias{showInTriangle}
 \title{Add points to the IBD triangle}
-\usage{
-showInTriangle(
-  k0,
-  k2 = NULL,
-  new = TRUE,
-  col = "blue",
-  cex = 1,
-  pch = 4,
-  lwd = 2,
-  labels = FALSE,
-  col_labels = col,
-  cex_labels = 0.8,
-  pos = 1,
-  adj = NULL,
-  ...
-)
-}
-\arguments{
-\item{k0, k2}{Numerical vectors giving coordinates for points to be plotted in
-the IBD triangle. Alternatively, \code{k0} may be a data.frame containing columns
-named \code{k0} and \code{k2}.}
-
-\item{new}{Logical indicating if a new IBDtriangle should be drawn.}
-
-\item{col, cex, pch, lwd}{Parameters passed onto \code{\link[=points]{points()}}.}
-
-\item{labels}{A character of same length as \code{k0} and \code{k2}, or a single
-logical \code{TRUE} or \code{FALSE}. If TRUE, and \code{k0} is a data.frame, labels will
-be created by pasting columns "ID1" and "ID2", if these are present. By
-default, no labels are plotted.}
-
-\item{col_labels, cex_labels, pos, adj}{Parameters passed onto \code{\link[=text]{text()}} (if
-\code{labels} is non-NULL).}
-
-\item{\dots}{Plot arguments passed on to \code{IBDtriangle()}.}
-}
-\value{
-None
-}
 \description{
-Utility function for plotting points in the IBD triangle.
-}
-\examples{
-showInTriangle(k0 = 3/8, k2 = 1/8, label = "3/4 siblings", pos = 1)
-
-}
-\seealso{
-\code{\link[=IBDestimate]{IBDestimate()}}
-}
-\author{
-Magnus Dehli Vigeland
+This function is re-exported from the \code{ribd} package. For documentation see
+\code{\link[ribd:showInTriangle]{ribd::showInTriangle()}}.
 }

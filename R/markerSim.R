@@ -15,12 +15,17 @@
 #'   simulated.
 #' @param ids A vector containing ID labels of those pedigree members whose
 #'   genotypes should be simulated. By default, all individuals are included.
-#' @param alleles A vector containing the alleles for the marker to be
-#'   simulation. If a single integer is given, this is interpreted as the number
-#'   of alleles, and the actual alleles as `1:alleles`. Must be NULL if
-#'   `partialmarker` is non-NULL.
-#' @param afreq A vector containing the population frequencies for
-#'   the marker alleles. Must be NULL if `partialmarker` is non-NULL.
+#' @param alleles (Only if `partialmarker` is NULL.) A vector with allele
+#'   labels. If NULL, the following are tried in order:
+#'
+#'   * `names(afreq)`
+#'
+#'   * `seq_along(afreq)'
+#'
+#'   * `1:2` (Fallback if both `alleles` and `afreq` are NULL.)
+#'
+#' @param afreq (Only if `partialmarker` is NULL.) A numeric vector with allele
+#'   frequencies, possibly named with allele labels.
 #' @param mutmod,rate Arguments specifying a mutation model, passed on to
 #'   [pedtools::marker()] (see there for explanations).
 #' @param partialmarker Either NULL (resulting in unconditional simulation), a
@@ -89,7 +94,7 @@ markerSim = function(x, N = 1, ids = NULL, alleles = NULL, afreq = NULL,
   if(!is.null(m)) {
 
     if (!is.null(alleles) || !is.null(afreq))
-      stop2("When `partialmarker` is given, both 'alleles' and 'afreq' must be NULL.")
+      stop2("When `partialmarker` is given, both `alleles` and `afreq` must be NULL.")
 
     if(is.marker(m)) { # TODO (fix/export from pedtools
       # validateMarker(m)
@@ -104,15 +109,10 @@ markerSim = function(x, N = 1, ids = NULL, alleles = NULL, afreq = NULL,
     if (!allowsMutations(m)) {
       err = mendelianCheck(setMarkers(x, m), verbose = FALSE)
       if (length(err) > 0)
-        stop2("Mendelian error in the given partial marker.")
+        stop2("The given marker data has a Mendelian error")
     }
   }
   else {
-    if (is.null(alleles))
-      stop2("Marker alleles must be specified")
-
-    if (is.numeric(alleles) && length(alleles) == 1)
-      alleles = seq_len(alleles)
     m = marker(x, alleles = alleles, afreq = afreq, mutmod = mutmod, rate = rate)
   }
 
@@ -183,7 +183,7 @@ markerSim = function(x, N = 1, ids = NULL, alleles = NULL, afreq = NULL,
     orig_ids = labels(x)
     x = breakLoops(setMarkers(x, m), loop_breakers = loopBreakers, verbose = verbose)
     m = x$MARKERS[[1]]
-    loopBreakers = labels(x)[x$LOOP_BREAKERS[, 1]] # NB: LOOP_BREAKERS are internal ints
+    loopBreakers = labels(x)[x$LOOP_BREAKERS[, 'orig']] # NB: LOOP_BREAKERS are internal ints
     gridlist = gridlist[sort.int(match(c(orig_ids, loopBreakers), orig_ids))]
   }
 
@@ -194,8 +194,12 @@ markerSim = function(x, N = 1, ids = NULL, alleles = NULL, afreq = NULL,
   FOU = founders(x, internal = TRUE)
   NONFOU = nonfounders(x, internal = TRUE)
 
+  lb_int = x$LOOP_BREAKERS[, "orig"]  # NULL if no loops
+  lb_copy_int = x$LOOP_BREAKERS[, "copy"]
+
   ### Determine simulation strategy
-  # Note: Using original x and m in this section (i.e. before loop breaking)
+  # Note: Using xorig and morig in this section (i.e. before loop breaking)
+  # Note2: Internal IDs are obtained from x, not xorig
 
   # Individuals that are typed (or forced - see above). Simulations condition on these.
   typedTF = (morig[, 1] != 0 | morig[, 2] != 0)
@@ -236,9 +240,16 @@ markerSim = function(x, N = 1, ids = NULL, alleles = NULL, afreq = NULL,
   simple.founders_int = intersect(simpledrop_int, FOU)
   simple.nonfounders_int = intersect(simpledrop_int, NONFOU)
 
+  # Ensure sensible ordering of nonfounders (for gene dropping)
   if (length(simple.nonfounders_int) > 0) {
-    # Ensure sensible ordering of nonfounders (for gene dropping)
-    done = c(internalID(x, typed), joint_int, bruteforce_int, simple.founders_int)
+    typed_int = internalID(x, typed)
+    done = c(typed_int, joint_int, bruteforce_int, simple.founders_int)
+
+    if(loops) {
+      done_copies_int = lb_copy_int[lb_int %in% done]
+      done = c(done, done_copies_int)
+    }
+
     v = simple.nonfounders_int
     v.ordered = numeric()
     while (length(v) > 0) {
@@ -247,6 +258,8 @@ markerSim = function(x, N = 1, ids = NULL, alleles = NULL, afreq = NULL,
         stop2("Could not determine sensible order for gene dropping.")
       v.ordered = c(v.ordered, v[i])
       done = c(done, v[i])
+      if(loops)
+        done = c(done, lb_copy_int[match(v[i], lb_int)])
       v = v[-i]
     }
     simple.nonfounders_int = v.ordered
@@ -276,7 +289,7 @@ markerSim = function(x, N = 1, ids = NULL, alleles = NULL, afreq = NULL,
     jointp = apply(allgenos_row_grid, 2, function(rownrs) {
       partial = m
       partial[joint_int, ] = allgenos[rownrs, ]
-      pedprobr::likelihood(x, marker1 = partial, eliminate = eliminate)
+      likelihood(x, partial, eliminate = eliminate)
     })
     likel_counter = likel_counter + length(jointp)
     if (identical(sum(jointp), 0))
@@ -297,8 +310,9 @@ markerSim = function(x, N = 1, ids = NULL, alleles = NULL, afreq = NULL,
         partial[] = markers[, c(mi - 1, mi)]  # preserves all attributes of the m.
         probs = unlist(lapply(gridi, function(r) {
           partial[i, ] = allgenos[r, ]
-          likelihood(x, marker1 = partial, eliminate = eliminate)
+          li = likelihood(x, partial, eliminate = eliminate)
         }))
+
         if (sum(probs) == 0) {
           print(partial)
           stop2("\nIndividual ", labels(x)[i], ": All genotype probabilities zero. Mendelian error?")
@@ -312,9 +326,6 @@ markerSim = function(x, N = 1, ids = NULL, alleles = NULL, afreq = NULL,
   }
 
   if (length(simpledrop) > 0) {
-    loopbr_int = internalID(x, x$LOOP_BREAKERS[, 1])  # integer(0) if no loops
-    loopbr_dup_int = internalID(x, x$LOOP_BRREAKERS[, 2])
-
     # HW sampling of founders
     if (!Xchrom) {
       markers[simple.founders_int, ] = sample.int(nall, size = 2 * N * length(simple.founders_int),
@@ -335,7 +346,8 @@ markerSim = function(x, N = 1, ids = NULL, alleles = NULL, afreq = NULL,
       markers[simple.founders_int[i], odd[copy] + 1] = markers[simple.founders_int[i], odd[copy]]
     }
 
-    markers[loopbr_dup_int, ] = markers[loopbr_int, ]  # Genotypes of the duplicated individuals. Some of these may be ungenotyped...save time by excluding these?
+    # Genotypes of the duplicated individuals. Some of these may be ungenotyped...save time by excluding these?
+    markers[lb_copy_int, ] = markers[lb_int, ]
 
     for (id in simple.nonfounders_int) {
       if (!Xchrom) {
@@ -376,25 +388,38 @@ markerSim = function(x, N = 1, ids = NULL, alleles = NULL, afreq = NULL,
   attrib = attributes(morig)
   attrib$name = NA_character_
 
-  markerdata_list = lapply(seq_len(N), function(k) {
-    mk = markers[, c(2 * k - 1, 2 * k)]
+  # Odd column numbers (needed below)
+  odd = seq_len(N) * 2 - 1
+
+  # Sort genotypes
+  a1 = markers[, odd]
+  a2 = markers[, odd + 1]
+  swap = a1 > a2
+
+  markers[, odd][swap] = a2[swap]
+  markers[, odd + 1][swap] = a1[swap]
+
+  # List of marker objects
+  mlist = lapply(odd, function(k) {
+    mk = markers[, c(k, k + 1)]
     attributes(mk) = attrib
     mk
   })
-  class(markerdata_list) = "MARKERS"
-  x = setMarkers(x, markerdata_list)
+
+  # Attach markers
+  class(mlist) = "markerList"
+  x = setMarkers(x, mlist, checkCons = FALSE)
 
   # If ped was reordered, revert to original
-  if(reorder) {
+  if(reorder)
     x = reorderPed(x, internalID(x, ORIGINAL_ORDER))
-  }
 
   if (verbose) {
     seconds = (proc.time() - starttime)[["elapsed"]]
     print(glue::glue("
       Simulation finished
       ===================
-      Number of calls to the likelihood function: {likel_counter}
+      Calls to `likelihood()`: {likel_counter}
       Total time used: {round(seconds, 2)} seconds
       \n"))
   }
@@ -443,10 +468,6 @@ markerSim = function(x, N = 1, ids = NULL, alleles = NULL, afreq = NULL,
 }
 
 
-
-
-
-
 #' Unconditional marker simulation
 #'
 #' Unconditional simulation of unlinked markers
@@ -458,15 +479,14 @@ markerSim = function(x, N = 1, ids = NULL, alleles = NULL, afreq = NULL,
 #'
 #' @param x a `ped` object
 #' @param N a positive integer: the number of markers to be simulated
-#' @param alleles a vector containing the allele names. If missing, the alleles
-#'   are taken to be `seq_along(afreq)`.
-#' @param afreq a vector of length 2 containing the population frequencies for
-#'   the alleles. If missing, the alleles are assumed equifrequent.
+#' @param alleles a vector with allele labels.
+#' @param afreq a numeric vector of allele frequencies. If missing, the alleles
+#'   are assumed to be equi-frequent.
 #' @param ids a vector containing ID labels of those pedigree members whose
 #'   genotypes should be simulated.
 #' @param Xchrom a logical: X linked markers or not?
-#' @param mutmod a [pedmut::mutationModel()] object, i.e., list of mutation matrices named
-#'   'female' and 'male'.
+#' @param mutmod a [pedmut::mutationModel()] object, i.e., list of mutation
+#'   matrices named 'female' and 'male'.
 #' @param seed NULL, or a numeric seed for the random number generator.
 #' @param verbose a logical.
 #' @return a `ped` object equal to `x` in all respects except its `MARKERS`
@@ -475,7 +495,6 @@ markerSim = function(x, N = 1, ids = NULL, alleles = NULL, afreq = NULL,
 #' @seealso [markerSim()]
 #'
 #' @examples
-#' library(pedtools)
 #' x = nuclearPed(1)
 #' simpleSim(x, N = 3, afreq = c(0.5, 0.5))
 #'
@@ -553,30 +572,46 @@ simpleSim = function(x, N, alleles, afreq, ids, Xchrom = FALSE,
   else
     m = .genedrop_AUT(x, N, nall, afreq, mutmod, seed)
 
+  # Remove genotypes for individuals not in `ids`
+  m[!labels(x) %in% ids, ] = 0L
+
+  # Odd column numbers (needed several times below)
   odd = seq_len(N) * 2 - 1
 
-  m[!labels(x) %in% ids, ] = 0L
+  # Sort genotypes
+  a1 = m[, odd]
+  a2 = m[, odd + 1]
+  swap = a1 > a2
+
+  m[, odd][swap] = a2[swap]
+  m[, odd + 1][swap] = a1[swap]
+
+  # Create marker objects
   if (variableSNPfreqs) {
+    frqs = as.vector(rbind(afreq, 1 - afreq))
     attrib = attributes(marker(x, alleles = alleles, afreq = NULL,
                                chrom = NA, mutmod = mutmod))
-    frqs = as.vector(rbind(afreq, 1 - afreq))
-    markerdata_list = lapply(odd, function(k) {
+    mlist = lapply(odd, function(k) {
       mk = m[, c(k, k + 1)]
       atr = attrib
       atr$afreq = frqs[c(k, k + 1)]
       attributes(mk) = atr
       mk
     })
-  } else {
+  }
+  else {
     attrib = attributes(marker(x, alleles = alleles, afreq = afreq,
                                chrom = ifelse(Xchrom, 23, NA), mutmod = mutmod))
-    markerdata_list = lapply(odd, function(k) {
+    mlist = lapply(odd, function(k) {
         mk = m[, c(k, k + 1)]
         attributes(mk) = attrib
         mk
     })
   }
-  x = setMarkers(x, structure(markerdata_list, class = "MARKERS"))
+
+  # Attach markers
+  class(mlist) = "markerList"
+  x = setMarkers(x, mlist, checkCons = FALSE)
 
   # If ped was reordered, revert to original
   if(reorder) {
@@ -587,7 +622,7 @@ simpleSim = function(x, N, alleles, afreq, ids, Xchrom = FALSE,
     seconds = (proc.time() - starttime)[["elapsed"]]
     print(glue::glue("
       Simulation finished.
-      Number of calls to the likelihood function: 0.
+      Calls to `likelihood()`: 0.
       Total time used: {round(seconds, 2)} seconds.
       "))
   }

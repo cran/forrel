@@ -1,7 +1,7 @@
 Package: forrel
 Type: Package
 Title: Forensic Pedigree Analysis and Relatedness Inference
-Version: 1.0.1
+Version: 1.1.0
 Authors@R: c(
     person("Magnus Dehli", "Vigeland", email = "m.d.vigeland@medisin.uio.no", 
            role = c("aut", "cre"), comment = c(ORCID = "0000-0002-9134-4962")),
@@ -28,14 +28,14 @@ Encoding: UTF-8
 Language: en-GB
 LazyData: true
 Depends: R (>= 3.1.0), pedtools (>= 0.9.3)
-Imports: pedprobr, maxLik, glue, pedmut,
+Imports: pedprobr (>= 0.3), ribd, pedmut, maxLik, glue
 Suggests: testthat, ggplot2, poibin
-RoxygenNote: 7.1.0
+RoxygenNote: 7.1.1
 NeedsCompilation: no
-Packaged: 2020-03-21 19:43:50 UTC; magnusdv
+Packaged: 2020-11-13 07:10:34 UTC; magnusdv
 Author: Magnus Dehli Vigeland [aut, cre]
     (<https://orcid.org/0000-0002-9134-4962>),
   Egeland Thore [ctb]
 Maintainer: Magnus Dehli Vigeland <m.d.vigeland@medisin.uio.no>
 Repository: CRAN
-Date/Publication: 2020-03-22 08:50:05 UTC
+Date/Publication: 2020-11-13 07:30:03 UTC

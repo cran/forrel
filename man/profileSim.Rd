@@ -4,7 +4,16 @@
 \alias{profileSim}
 \title{Simulation of complete DNA profiles}
 \usage{
-profileSim(x, N = 1, ids = NULL, markers = NULL, seed = NULL, ...)
+profileSim(
+  x,
+  N = 1,
+  ids = NULL,
+  markers = NULL,
+  seed = NULL,
+  numCores = 1,
+  verbose = TRUE,
+  ...
+)
 }
 \arguments{
 \item{x}{A \code{ped} object or a list of such.}
@@ -15,12 +24,16 @@ profileSim(x, N = 1, ids = NULL, markers = NULL, seed = NULL, ...)
 whose genotypes should be simulated.}
 
 \item{markers}{A list of marker objects, or a vector containing names or
-indices referring to markers attached to \code{x}. By default (\code{markers = NULL})
-all attached markers are used. The simulations will be conditional on the
-locus attributes (allele frequencies, mutation models a.s.o.) and any
-existing genotypes in the indicated markers.}
+indices referring to markers attached to \code{x}. By default (\code{NULL}), all
+attached markers are used. The simulations will be conditional on the locus
+attributes (allele frequencies, mutation models a.s.o.) and any existing
+genotypes in the indicated markers.}
 
 \item{seed}{NULL, or a numeric seed for the random number generator.}
+
+\item{numCores}{The number of cores used for parallelisation, by default 1.}
+
+\item{verbose}{A logical, by default TRUE.}
 
 \item{...}{Further arguments passed on to \code{\link[=markerSim]{markerSim()}}.}
 }
@@ -46,6 +59,5 @@ x = setMarkers(x, list(m1, m2))
 
 # Simulate 3 profiles of B2 conditional on the above
 profileSim(x, N = 3, ids = "B2")
-
 
 }

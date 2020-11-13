@@ -4,19 +4,28 @@
 \alias{IBDestimate}
 \title{Relatedness estimation}
 \usage{
-IBDestimate(x, ids = NULL, markers = NULL, start = c(0.99, 0.001), tol = 1e-07)
+IBDestimate(
+  x,
+  ids = typedMembers(x),
+  markers = NULL,
+  start = c(0.99, 0.001),
+  tol = 1e-07,
+  contourPlot = FALSE,
+  levels = NULL
+)
 }
 \arguments{
 \item{x}{A \code{ped} object or a list of such.}
 
 \item{ids}{Either a vector with ID labels, or a data frame/matrix with two
-columns, where each row contains the ID labels of two individuals. The entries
-are coerced to characters, and must match uniquely against the ID labels of
-\code{x}. If \code{ids} is a vector, it is converted to a matrix containing all pairs.
-By default, all individuals of \code{x} are included.}
+columns, where each row contains the ID labels of two individuals. The
+entries are coerced to characters, and must match uniquely against the ID
+labels of \code{x}. If \code{ids} is a vector, it is converted to a matrix containing
+all pairs. By default, all individuals of \code{x} are included.}
 
-\item{markers}{A numeric indicating which marker(s) to include. If NULL
-(default), all markers are used.}
+\item{markers}{A vector with names or indices of markers attached to x,
+indicating which markers to include. If NULL (default), all markers are
+used.}
 
 \item{start}{Numeric of length 2, indicating the initial value of
 \eqn{(\kappa_0, \kappa_2)}{(\kappa0, \kappa2)} in the optimisation (passed
@@ -24,40 +33,64 @@ on to \code{maxLik}).}
 
 \item{tol}{A single numeric: the optimising tolerance value; passed on to
 \code{maxLik()}).}
+
+\item{contourPlot}{A logical. If TRUE, contours of the log-likelihood
+function are plotted overlaying the IBD triangle.}
+
+\item{levels}{A numeric vector of levels at which to draw contour lines. If
+NULL (default), levels are chosen automatically. (This option is ignored
+unless \code{contourPlot = TRUE}.)}
 }
 \value{
-A data frame with 6 columns: \code{ID1}, \code{ID2}, \code{N} (the number of markers
+A data frame with 6 columns: \code{id1}, \code{id2}, \code{N} (the number of markers
 with no missing alleles), \code{k0}, \code{k1} and \code{k2}.
 }
 \description{
-Estimate the pairwise IBD coefficients \eqn{(\kappa_0, \kappa_1,
-\kappa_2)}{(\kappa0, \kappa1, \kappa2)} for specified pairs of pedigree
-members, using maximum likelihood methods. The optimisation machinery is
-imported from the \code{maxLik} package.
+Estimate the IBD coefficients \eqn{\kappa = (\kappa_0, \kappa_1,
+\kappa_2)}{(\kappa0, \kappa1, \kappa2)} between a pair (or several pairs) of
+pedigree members, using maximum likelihood methods. The optimisation
+machinery is imported from the \code{maxLik} package.
 }
 \details{
-This function optimises the log-likelihood function first described in
-(Thompson, 1975). Optimisation is done in the \eqn{(\kappa_0,
+This function optimises the log-likelihood function first described by
+Thompson (1975). Optimisation is done in the \eqn{(\kappa_0,
 \kappa_2)}{(\kappa0, \kappa2)}-plane and restricted to the probability
 triangle defined by \deqn{\kappa_0 \ge 0, \kappa_2 \ge 0, \kappa_0 + \kappa_2
 \le 1.}{\kappa0 \ge 0, \kappa2 \ge 0, \kappa0 + \kappa2 \le 1.}
+
+It should be noted that this procedure estimates the \emph{realised} coefficients
+of each specific pair, i.e., the actual fractions of the autosomes where the
+individuals share 0,1,2 alleles IBD respectively. These may deviate from the
+pedigree coefficients.
 }
 \examples{
 
 ### Example 1: Siblings
-x = nuclearPed(children = c("sib1", "sib2"))
+ids = c("sib1", "sib2")
 
-# Simluate 200 equifrequent SNPs
-x = markerSim(x, N = 200, alleles = 1:2, verbose = FALSE)
+# Pedigree
+x = nuclearPed(children = ids)
+
+# Simulate 100 markers
+x = markerSim(x, N = 100, alleles = 1:4, seed = 123, verbose = FALSE)
 
 # Estimate IBD coefficients (exact = (0.25, 0.5, 0.25))
-est = IBDestimate(x, ids = c("sib1", "sib2"))
-showInTriangle(est, labels = TRUE)
+est = IBDestimate(x, ids = ids)
+
+# Show the result in the IBD triangle
+ribd::showInTriangle(est, labels = TRUE)
+
+# Contour plot (just a few markers to save time)
+IBDestimate(x, ids = ids, markers = 1:10,
+            contourPlot = TRUE, levels = -(43:50))
 
 ### Example 2: Unrelated singletons
 y = list(singleton(1), singleton(2))
+
+# Simulate 200 SNP markers
 y = markerSim(y, N = 200, alleles = 1:2, verbose = FALSE)
 
+# Estimate
 IBDestimate(y, ids = 1:2)
 
 
@@ -72,7 +105,7 @@ Statistics. Volume 6.
 }
 }
 \seealso{
-\code{\link[maxLik:maxLik]{maxLik::maxLik()}}, \code{\link[=showInTriangle]{showInTriangle()}}
+\code{\link[=checkPairwise]{checkPairwise()}}, \code{\link[ribd:showInTriangle]{ribd::showInTriangle()}}, \code{\link[maxLik:maxLik]{maxLik::maxLik()}}
 }
 \author{
 Magnus Dehli Vigeland

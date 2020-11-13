@@ -7,18 +7,20 @@
 missingPersonPlot(
   reference,
   missing,
-  id.labels = labels(reference),
+  labs = labels(reference),
+  marker = NULL,
+  hatched = typedMembers(reference),
   MP.label = "MP",
   POI.label = "POI",
-  marker = NULL,
-  shaded = "typed",
+  POI.sex = getSex(reference, missing),
   POI.col = "red",
-  POI.shaded = FALSE,
+  POI.hatched = FALSE,
   POI.height = 8,
+  titles = c(expression(H[1] * ": POI = MP"), expression(H[2] * ": POI unrelated")),
   width = 4,
-  newdev = TRUE,
-  frametitles = c(expression(H[1] * ": POI is MP"), expression(H[2] *
-    ": POI unrelated")),
+  newdev = interactive(),
+  id.labels = NULL,
+  frametitles = NULL,
   ...
 )
 }
@@ -27,25 +29,32 @@ missingPersonPlot(
 
 \item{missing}{The ID label of the missing pedigree member.}
 
-\item{id.labels}{A character vector with labels for the pedigree members. See
+\item{labs}{A character vector with labels for the pedigree members. See
 \code{\link[pedtools:plot.ped]{pedtools::plot.ped()}}.}
+
+\item{marker}{Optional vector of marker indices to be included in the plot.}
+
+\item{hatched}{A vector of ID labels indicating who should appear with hatched
+symbols in the plot. By default, all typed members.}
 
 \item{MP.label}{The label of the missing member. Default: "MP".}
 
 \item{POI.label}{The label of the person of interest. Default: "POI".}
 
-\item{marker}{Optional vector of marker indices to be included in the plot.}
-
-\item{shaded}{A vector of ID labels indicating who should appear with shaded
-symbols. By default, all typed members.}
+\item{POI.sex}{The sex of POI. This defaults to that of the missing person,
+but may be set explicitly. This is particularly useful when the missing
+person has unknown sex.}
 
 \item{POI.col}{The plot colour of POI. Default: red.}
 
-\item{POI.shaded}{A logical: If TRUE (default), the POI is plotted with a
-shaded symbol.}
+\item{POI.hatched}{A logical: If TRUE (default), the POI is plotted with a
+hatched symbol.}
 
 \item{POI.height}{A numeric controlling the vertical placement of the POI
 singleton (in the right panel).}
+
+\item{titles}{A character of length 2, with subtitles for the two
+frames.}
 
 \item{width}{A positive number controlling the width of the plot. More
 specifically this number is the relative width of the reference pedigree,
@@ -53,7 +62,7 @@ compared to a singleton. Default: 4.}
 
 \item{newdev}{A logical: If TRUE the plot is created in a new plot window.}
 
-\item{frametitles}{A character of length 2, with subtitles for the two frames.}
+\item{frametitles, id.labels}{Deprecated arguments.}
 
 \item{...}{Extra parameters passed on to \code{\link[pedtools:plotPedList]{pedtools::plotPedList()}}.}
 }
@@ -99,8 +108,8 @@ x = nuclearPed(father = "fa", mother = "mo", children = c("b1", "b2"))
 missingPersonPlot(x, missing = "b2")
 
 # A bit nicer using various options
-missingPersonPlot(x, missing = "b2", MP.label = "Missing", id.label = NULL,
-                  shaded = "b1", POI.shaded = TRUE,
+missingPersonPlot(x, missing = "b2", MP.label = "Missing", labs = NULL,
+                  hatched = "b1", POI.hatched = TRUE,
                   width = 2,      # adjust internal spacing (see above)
                   dev.width = 7,  # device width (see ?plotPedList())
                   dev.height = 3, # device height (see ?plotPedList())

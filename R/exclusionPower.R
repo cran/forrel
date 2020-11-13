@@ -34,7 +34,7 @@
 #'   mutations should be disabled.
 #' @param exactMaxL A positive integer, or `Inf` (default). Exact EPs are
 #'   calculated for markers whose number of alleles is less or equal to
-#'   `exactMaxL`; remaining markers are handled using a simulation.
+#'   `exactMaxL`; remaining markers are handled by simulation.
 #' @param nsim A positive integer; the number of simulations used for markers
 #'   whose number of alleles exceeds `exactMaxL`.
 #' @param seed A numeric seed for the random number generator (optional).
@@ -97,22 +97,19 @@
 #' # Truth: 1 and 3 are unrelated
 #' true = list(singleton(id = 1), singleton(id = 3, sex = 2))
 #'
-#' # Attach 3 markers
+#' # Attach two markers
 #' m1 = marker(claim, alleles = 1:2)
 #' m2 = marker(claim, alleles = 1:3)
-#' m3 = marker(claim, alleles = 1:2, chrom = "X")
-#' claim = setMarkers(claim, list(m1, m2, m3))
+#' claim = setMarkers(claim, list(m1, m2))
 #'
 #' # Compute EP when father and child is available for genotyping
-#' exclusionPower(claim, true, ids = c(1,3))
+#' # exclusionPower(claim, true, ids = c(1,3))
 #'
-#' # Suppose child is genotyped
+#' # Suppose child is already genotyped
 #' genotype(claim, marker = 1, id = 3) = c(1, 1)
 #' genotype(claim, marker = 2, id = 3) = c(1, 1)
-#' genotype(claim, marker = 3, id = 3) = c(1, 2)
 #'
-#' # Compute EP when father is available
-#' exclusionPower(claim, true, ids = 1)
+#' # exclusionPower(claim, true, ids = 1)
 #'
 #'
 #' ############################################
@@ -153,7 +150,16 @@ exclusionPower = function(claimPed, truePed, ids, markers = NULL, source = "clai
                           plot = FALSE, plotMarkers = NULL, verbose = TRUE) {
 
   st = Sys.time()
-  ids = as.character(ids)
+
+  # Ensure `ids` is a list of character vectors
+  if(!is.list(ids))
+    ids = list(ids)
+  ids = lapply(ids, as.character)
+  idslabs = sapply(ids, paste, collapse = "-")
+  allids = unique.default(unlist(ids))
+
+  # Number of `ids` vectors
+  NI = length(ids)
 
   ### Input option 1: Single marker with attributes given directly
   if(!is.null(alleles) || !is.null(afreq)) {
@@ -172,7 +178,7 @@ exclusionPower = function(claimPed, truePed, ids, markers = NULL, source = "clai
     }
 
     # If `alleles` is single integer, convert to sequence
-    if(length(alleles) == 1 && is.numeric(alleles))
+    if(isNumber(alleles))
       alleles = seq_len(alleles)
 
     # Create and attach locus to both pedigrees
@@ -181,6 +187,7 @@ exclusionPower = function(claimPed, truePed, ids, markers = NULL, source = "clai
     truePed = setMarkers(truePed, alleleMatrix = am, locusAttributes = locus)
 
     markers = 1
+    typed = typedMembers(truePed)
     hasMut = FALSE
     disableMutations = FALSE # don't do anything
   }
@@ -203,7 +210,7 @@ exclusionPower = function(claimPed, truePed, ids, markers = NULL, source = "clai
 
     # Check for already typed members. TODO: Support for partially typed members
     typed = typedMembers(sourcePed)
-    if(length(bad <- intersect(ids, typed)))
+    if(length(bad <- intersect(allids, typed)))
       stop2("Individual is already genotyped: ", toString(bad))
 
     # Transfer marker data to the other pedigree
@@ -222,9 +229,9 @@ exclusionPower = function(claimPed, truePed, ids, markers = NULL, source = "clai
   if (isTRUE(plot) || plot == "plotOnly") {
     plotPedList(list(claimPed, truePed),
                 newdev = TRUE,
-                frametitles = c("Claim", "True"),
-                shaded = function(p) c(ids, typedMembers(p)),
-                col = list(red = ids),
+                titles = c("Claim", "True"),
+                hatched = function(p) c(allids, typedMembers(p)),
+                col = list(red = allids),
                 marker = match(plotMarkers, markers))
 
     if (plot == "plotOnly")
@@ -264,10 +271,11 @@ exclusionPower = function(claimPed, truePed, ids, markers = NULL, source = "clai
   }
 
   ### Baseline likelihoods
-  trueBase = vapply(seq_len(nMark), function(m) likelihood(truePed, m), 0)
-  claimBase = vapply(seq_len(nMark), function(m) likelihood(claimPed, m), 0)
+  trueBase = likelihood(truePed, marker1 = seq_len(nMark))
+  claimBase = likelihood(claimPed, seq_len(nMark))
 
-  ### Compute the exclusion power of each marker
+  ### Compute the exclusion power of each marker.
+  # The result is rectangular, with nMark columns and NI rows
   ep = vapply(seq_len(nMark), function(i) {
 
     m = markers[i]
@@ -276,59 +284,71 @@ exclusionPower = function(claimPed, truePed, ids, markers = NULL, source = "clai
 
     # Disable mutations?
     if(verbose) {
-      action = if(i %in% disableMutations) "disabled. " else if(hasMut[i]) "kept. " else "not found. "
-      message("Mutation model ", action, appendLF = FALSE)
+      action = if(i %in% disableMutations) "Mutation model disabled. "
+      else if(hasMut[i]) "Mutation model applied. "
+      else "No mutation model. "
+      message(action, appendLF = FALSE)
     }
 
     # If impossible in true, return NA
     if(trueBase[i] == 0) {
       if(verbose)
-        message("INCOMPATIBLE WITH TRUE PEDIGREE! PE = NA")
-      return(NA_real_)
+        message("INCOMPATIBLE WITH TRUE PEDIGREE! EP = NA")
+      return(rep(NA_real_, NI))
     }
 
     # If impossible in claim, return 1
     if(claimBase[i] == 0) {
       if(verbose)
-        message("INCOMPATIBLE WITH CLAIMED PEDIGREE! PE = 1")
-      return(1)
+        message("INCOMPATIBLE WITH CLAIMED PEDIGREE! EP = 1")
+      return(rep(1, NI))
     }
 
-    # Otherwise, compute EP
+    # Exact of simulation?
     exactCalc = nAlleles(truePed, marker = i) <= exactMaxL
-    if(exactCalc)
-      this.ep = .EPsingleMarker(claimPed, truePed, ids, marker = i, verbose = FALSE)
-    else
-      this.ep = .EPsingleMarker_simulated (claimPed, truePed, ids, marker = i, nsim = nsim, verbose = FALSE)
+
+    # Compute/estimate EP value for each `ids` entry
+    if(exactCalc) {
+      if(verbose)
+        message("Computing exact EP.")
+      this.ep = unlist(lapply(ids, function(idvec) {
+        .EPsingleMarker(claimPed, truePed, idvec, marker = i, verbose = FALSE)
+      }))
+    }
+    else {
+      if(verbose)
+        message("Estimating EP by simulation.")
+      trueSims = markerSim(truePed, ids = allids, N = nsim, partialmarker = i,
+                           seed = seed, verbose = FALSE)
+
+      this.ep = unlist(lapply(ids, function(idvec) {
+        claimSims = transferMarkers(trueSims, claimPed, ids = c(typed, idvec))
+        liks = likelihood(claimSims, 1:nsim)
+        mean(liks == 0)
+      }))
+    }
 
     if(verbose)
-      message("PE = ", this.ep, if(!exactCalc) " (simulated)")
+      if(NI == 1) cat(round(this.ep, 3), "\n") else print(setNames(round(this.ep, 3), idslabs))
 
     this.ep
-  }, FUN.VALUE = 0)
+  }, FUN.VALUE = numeric(NI))
 
-  # Total EP
-  tot = 1 - prod(1 - ep, na.rm = TRUE)
+  # List of parameters
+  params = list(markers = markers, disableMutations = disableMutations,
+                exactMaxL = exactMaxL, nsim = nsim, seed = seed, allids = allids, typed = typed)
 
-  # Expected number of exclusions
-  expMis = sum(ep, na.rm = TRUE)
-
-  # Distribution of number of mismatches
-  # This is a sum of different Bernoulli variables, i.e., Poisson binomial.
-  n.nonz = sum(ep > 0, na.rm = TRUE)
-  if(n.nonz == 0)
-    distrib = c(`0` = 1)
-  else {
-    distrib = setNames(rep(NA_real_, n.nonz + 1), 0:n.nonz)
-    if (requireNamespace("poibin", quietly = TRUE))
-      distrib[] = poibin::dpoibin(kk = 0:n.nonz, pp = ep[!is.na(ep) & ep > 0])
-    else
-      warning("Package `poibin` not found. Cannot compute the distribution of exclusion counts without this; returning NA's")
+  # Summarise over all markers
+  if(length(ids) == 1) { # in this case `ep` is just a vector
+    res = summariseEP(ep)
+    res$params = c(params, list(ids = ids[[1]]))
   }
-
-  # Ad hoc fix: If all ep are NA, the other results should also be NA (not 0)
-  if(all(is.na(ep))) {
-    tot = expMis = distrib = NA
+  else {
+    res = lapply(seq_along(ids), function(i) {
+      resi = summariseEP(ep[i, ])
+      resi$params = c(params, list(ids = ids[[i]]))
+      resi
+    })
   }
 
   # Timing
@@ -336,12 +356,38 @@ exclusionPower = function(claimPed, truePed, ids, markers = NULL, source = "clai
   if(verbose)
     message("Total time used: ", format(time, digits = 3))
 
-  # List of input parameters
-  params = list(ids = ids, markers = markers, disableMutations = disableMutations,
-                exactMaxL = exactMaxL, nsim = nsim, seed = seed)
+  res
+}
 
-  structure(list(EPperMarker = ep, EPtotal = tot, expectedMismatch = expMis,
-                 distribMismatch = distrib, time = time, params = params), class = "EPresult")
+
+# Summarise a vector of single-marker exclusion powers
+summariseEP = function(epvec) {
+  # Total EP
+  tot = 1 - prod(1 - epvec, na.rm = TRUE)
+
+  # Expected number of exclusions
+  expMis = sum(epvec, na.rm = TRUE)
+
+  # Distribution of number of mismatches
+  # This is a sum of different Bernoulli variables, i.e., Poisson binomial.
+  n.nonz = sum(epvec > 0, na.rm = TRUE)
+  if(n.nonz == 0)
+    distrib = c(`0` = 1)
+  else {
+    distrib = setNames(rep(NA_real_, n.nonz + 1), 0:n.nonz)
+    if (requireNamespace("poibin", quietly = TRUE))
+      distrib[] = poibin::dpoibin(kk = 0:n.nonz, pp = epvec[!is.na(epvec) & epvec > 0])
+    else
+      warning("Package `poibin` not found. Cannot compute the distribution of exclusion counts without this; returning NA's")
+  }
+
+  # Ad hoc fix: If all epvec are NA, the other results should also be NA (not 0)
+  if(all(is.na(epvec))) {
+    tot = expMis = distrib = NA
+  }
+
+  structure(list(EPperMarker = epvec, EPtotal = tot, expectedMismatch = expMis, distribMismatch = distrib),
+            class = "EPresult")
 }
 
 #' @export
@@ -355,10 +401,12 @@ print.EPresult = function(x, ...) {
 
   expMis = round(x$expectedMismatch, 3)
 
-  cat("Total EP:", round(x$EPtotal, 3), "\n")
-  cat("Markers inconsistent with pedigree:", sum(incons), incons_names, "\n")
-  cat("Markers with potential mismatch:", nPoss, poss_names, "\n")
-  cat("Expected number of mismatches:", expMis, "\n")
+  if(sum(incons) > 0)
+    cat("Impossible markers:", sum(incons), incons_names, "\n")
+  cat("Potential mismatches:", nPoss, poss_names, "\n")
+  cat("Expected mismatches:", expMis, "\n")
+  cat("P(at least 1 mismatch):", round(x$EPtotal, 3), "\n")
+
 }
 
   ###############################
@@ -366,6 +414,7 @@ print.EPresult = function(x, ...) {
   ###############################
 
 .EPsingleMarker = function(claimPed, truePed, ids, marker, verbose = TRUE) {
+
   # Step 1: Genotype combinations incompatible with "claim"
   # Step 2: Probability of incomp under `true` pedigree
 
@@ -473,10 +522,3 @@ print.EPresult = function(x, ...) {
   sum(excl)
 }
 
-.EPsingleMarker_simulated = function(claimPed, truePed, ids, marker, nsim = 1000, verbose = TRUE) {
-  trueSims = markerSim(truePed, ids = ids, N = nsim, partialmarker = marker, verbose = FALSE)
-
-  claimSims = transferMarkers(trueSims, claimPed)
-  liks = sapply(1:nsim, function(i) pedprobr::likelihood(claimSims, marker1 = i))
-  mean(liks == 0)
-}

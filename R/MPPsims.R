@@ -15,7 +15,7 @@
 #'   "Baseline", is added as the first element of `selection`.
 #' @param nProfiles The number of profile simulations for each selection.
 #' @param lrSims,thresholdIP Parameters passed onto [missingPersonIP()].
-#' @param numCores The number of cores used in the parallelisation setup.
+#' @param numCores The number of cores used for parallelisation, by default 1.
 #'
 #' @return An object of class "MPPsim", which is basically a list with one entry
 #'   for each element of `selections`. Each entry has elements `ep` and `ip`,
@@ -43,17 +43,17 @@
 #'                 id = c("S1", "S2", "MP"))
 #' x = addSon(x, "Father", id = "HS")
 #'
-#' # Brother S1 is already genotyped with a marker with 5 alleles
+#' # Brother S1 is already genotyped with a marker with 4 alleles
 #' m = marker(x, S1 = 1:2, alleles = 1:4)
 #' x = setMarkers(x, m)
 #'
 #' # Alternatives for additional genotyping
 #' sel = list("Father", "S2", "HS", c("Gm", "Uncle"))
 #'
-#' plot(x, marker = 1, shaded = sel)
+#' plot(x, marker = 1, hatched = sel)
 #'
 #' # Simulate
-#' simData = MPPsims(x, selections = sel, nProfiles = 2, lrSims = 2, numCores = 1)
+#' simData = MPPsims(x, selections = sel, nProfiles = 2, lrSims = 2)
 #'
 #' # Power plot
 #' powerPlot(simData, type = 3)
@@ -69,27 +69,17 @@
 #' mutmod(x, 1:2) = list("equal", rate = 0.1)
 #'
 #' # By default mutations are disabled for consistent markers
-#' MPPsims(x, selections = "Father", addBaseline = FALSE, seed = 123)
+#' # MPPsims(x, selections = "Father", addBaseline = FALSE)
 #'
 #' # Don't disable anything
-#' MPPsims(x, selections = "Father", addBaseline = FALSE, seed = 123,
-#'         disableMutations = FALSE)
+#' # MPPsims(x, selections = "Father", addBaseline = FALSE,
+#' #       disableMutations = FALSE)
 #'
 #'
 #' # Disable all mutation models. SHOULD GIVE ERROR FOR SECOND MARKER
-#' MPPsims(x, selections = "Father", addBaseline = FALSE, seed = 123,
-#'         disableMutations = TRUE)
+#' # MPPsims(x, selections = "Father", addBaseline = FALSE,
+#' #         disableMutations = TRUE)
 #'
-#'
-#' # Effect of variable number of alleles
-#' y = nuclearPed(father = "fa", child = "MP")
-#' mlist = lapply(2:5, function(k) marker(y, alleles = 1:k))
-#' y = setMarkers(y, mlist)
-#' peds = lapply(1:nMarkers(y), function(i) selectMarkers(y, i))
-#' sel = rep("fa", 4)
-#' names(sel) = paste(2:5, "alleles")
-#' pows = MPPsims(peds, selections = sel, addBaseline = FALSE, lrSims = 10)
-#' powerPlot(pows, type = 3)
 #' }
 #'
 #' @importFrom parallel makeCluster stopCluster detectCores parLapply
@@ -97,7 +87,7 @@
 #' @export
 MPPsims = function(reference, missing = "MP", selections, ep = TRUE, ip = TRUE,
                    addBaseline = TRUE, nProfiles = 1, lrSims = 1, thresholdIP = NULL,
-                   disableMutations = NA, numCores = NA, seed = NULL, verbose = TRUE) {
+                   disableMutations = NA, numCores = 1, seed = NULL, verbose = TRUE) {
   st = Sys.time()
 
   if(!is.list(selections))
@@ -132,13 +122,13 @@ MPPsims = function(reference, missing = "MP", selections, ep = TRUE, ip = TRUE,
 
   # Setup parallelisation
   if(is.na(numCores))
-    numCores = detectCores() - 1
+    numCores = max(detectCores() - 1, 1)
+
   if(numCores > 1) {
     cl = makeCluster(numCores)
     on.exit(stopCluster(cl))
     if(verbose) {
-      message("Preparing parallelisation... ", appendLF = FALSE)
-      print(cl)
+      message("Preparing parallelisation using ", length(cl), " cores")
     }
     clusterEvalQ(cl, library(forrel))
     clusterExport(cl, c("missingPersonEP", "missingPersonIP", "lrSims", "thresholdIP"), envir = environment())
@@ -160,7 +150,7 @@ MPPsims = function(reference, missing = "MP", selections, ep = TRUE, ip = TRUE,
     }
 
     # Simulate profile for `ids`
-    sims = profileSim(ref, ids = ids, N = nProfiles)
+    sims = profileSim(ref, ids = ids, N = nProfiles, numCores = 1, verbose = FALSE)
 
 
     # Compute updated EP and IP for each profile
