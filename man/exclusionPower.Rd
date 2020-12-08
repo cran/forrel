@@ -107,6 +107,11 @@ excluding a claimed relationship, given the true relationship.
 \details{
 This function implements the formula for exclusion power as defined and
 discussed in (Egeland et al., 2014).
+
+It should be noted that \code{claimPed} and \code{truePed} may be any (lists of)
+pedigrees, as long as they both contain the individuals specified by \code{ids}.
+In particular, either alternative may have inbred founders (with the same or
+different coefficients), but this must be set individually for each.
 }
 \examples{
 
@@ -128,13 +133,13 @@ m2 = marker(claim, alleles = 1:3)
 claim = setMarkers(claim, list(m1, m2))
 
 # Compute EP when father and child is available for genotyping
-# exclusionPower(claim, true, ids = c(1,3))
+exclusionPower(claim, true, ids = c(1,3))
 
 # Suppose child is already genotyped
 genotype(claim, marker = 1, id = 3) = c(1, 1)
 genotype(claim, marker = 2, id = 3) = c(1, 1)
 
-# exclusionPower(claim, true, ids = 1)
+exclusionPower(claim, true, ids = 1)
 
 
 ############################################

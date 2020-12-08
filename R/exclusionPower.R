@@ -6,6 +6,11 @@
 #' This function implements the formula for exclusion power as defined and
 #' discussed in (Egeland et al., 2014).
 #'
+#' It should be noted that `claimPed` and `truePed` may be any (lists of)
+#' pedigrees, as long as they both contain the individuals specified by `ids`.
+#' In particular, either alternative may have inbred founders (with the same or
+#' different coefficients), but this must be set individually for each.
+#'
 #' @param claimPed A `ped` object (or a list of such), describing the claimed
 #'   relationship. If a list, the sets of ID labels must be disjoint, that is,
 #'   all ID labels must be unique.
@@ -103,13 +108,13 @@
 #' claim = setMarkers(claim, list(m1, m2))
 #'
 #' # Compute EP when father and child is available for genotyping
-#' # exclusionPower(claim, true, ids = c(1,3))
+#' exclusionPower(claim, true, ids = c(1,3))
 #'
 #' # Suppose child is already genotyped
 #' genotype(claim, marker = 1, id = 3) = c(1, 1)
 #' genotype(claim, marker = 2, id = 3) = c(1, 1)
 #'
-#' # exclusionPower(claim, true, ids = 1)
+#' exclusionPower(claim, true, ids = 1)
 #'
 #'
 #' ############################################
@@ -271,65 +276,56 @@ exclusionPower = function(claimPed, truePed, ids, markers = NULL, source = "clai
   }
 
   ### Baseline likelihoods
-  trueBase = likelihood(truePed, marker1 = seq_len(nMark))
-  claimBase = likelihood(claimPed, seq_len(nMark))
+  trueBase = likelihood(truePed, markers = seq_len(nMark))
+  claimBase = likelihood(claimPed, markers = seq_len(nMark))
 
   ### Compute the exclusion power of each marker.
   # The result is rectangular, with nMark columns and NI rows
   ep = vapply(seq_len(nMark), function(i) {
 
     m = markers[i]
-    if(verbose)
-      message("Marker ", m, ". ", appendLF = FALSE)
+    nall = nAlleles(truePed, marker = i)
+    exactCalc = nall <= exactMaxL
 
-    # Disable mutations?
     if(verbose) {
-      action = if(i %in% disableMutations) "Mutation model disabled. "
-      else if(hasMut[i]) "Mutation model applied. "
-      else "No mutation model. "
-      message(action, appendLF = FALSE)
+      mut = if(i %in% disableMutations) "disabled" else if(hasMut[i]) "enabled" else "no"
+      method = ifelse(exactCalc, "Exact", "Simulation")
+      message(sprintf("Marker %s: %d alleles; %s mut model. Method: %s", m, nall, mut, method))
     }
 
     # If impossible in true, return NA
     if(trueBase[i] == 0) {
       if(verbose)
-        message("INCOMPATIBLE WITH TRUE PEDIGREE! EP = NA")
+        message("  *** INCOMPATIBLE WITH TRUE PEDIGREE ***\n  -> EP = NA")
       return(rep(NA_real_, NI))
     }
 
     # If impossible in claim, return 1
     if(claimBase[i] == 0) {
       if(verbose)
-        message("INCOMPATIBLE WITH CLAIMED PEDIGREE! EP = 1")
+        message("  *** INCOMPATIBLE WITH CLAIMED PEDIGREE ***\n  -> EP = 1")
       return(rep(1, NI))
     }
 
-    # Exact of simulation?
-    exactCalc = nAlleles(truePed, marker = i) <= exactMaxL
-
     # Compute/estimate EP value for each `ids` entry
     if(exactCalc) {
-      if(verbose)
-        message("Computing exact EP.")
       this.ep = unlist(lapply(ids, function(idvec) {
         .EPsingleMarker(claimPed, truePed, idvec, marker = i, verbose = FALSE)
       }))
     }
     else {
-      if(verbose)
-        message("Estimating EP by simulation.")
       trueSims = markerSim(truePed, ids = allids, N = nsim, partialmarker = i,
                            seed = seed, verbose = FALSE)
 
       this.ep = unlist(lapply(ids, function(idvec) {
         claimSims = transferMarkers(trueSims, claimPed, ids = c(typed, idvec))
-        liks = likelihood(claimSims, 1:nsim)
+        liks = likelihood(claimSims, markers = 1:nsim)
         mean(liks == 0)
       }))
     }
 
     if(verbose)
-      if(NI == 1) cat(round(this.ep, 3), "\n") else print(setNames(round(this.ep, 3), idslabs))
+      message("  -> EP = ", paste(round(this.ep, 3), collapse = " "))
 
     this.ep
   }, FUN.VALUE = numeric(NI))

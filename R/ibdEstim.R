@@ -27,11 +27,10 @@
 #' @param markers A vector with names or indices of markers attached to x,
 #'   indicating which markers to include. If NULL (default), all markers are
 #'   used.
-#' @param param Either "kappa" (default) or "delta"; indicating which set of coefficients should be estimated.
+#' @param param Either "kappa" (default) or "delta"; indicating which set of
+#'   coefficients should be estimated.
 #' @param start Numeric of length 3 (if `param = "kappa"`) or 9 (if `param =
-#'   "delta"`), indicating an initial value of for the optimisation. This must
-#'   be in the interior of the probability simplex, i.e., all elements must be
-#'   strictly positive and sum to 1. (The resulting estimate can still be on the border.)
+#'   "delta"`), indicating an initial value of for the optimisation.
 #' @param reltol Relative convergence tolerance; passed on to `constrOptim()`.
 #'   Defaults to 1e-12,
 #' @param returnArgs A logical; for debugging purposes.
@@ -128,7 +127,7 @@ ibdEstim = function(x, ids = typedMembers(x), param = c("kappa", "delta"),
 }
 
 .kappaEstim = function(dat, start, reltol, returnArgs = FALSE, ...) {
-  pair = names(dat)
+  pair = names(dat) %||% c("_1", "_2")
 
   # Remove missing
   keep = !is.na(dat[[1]]$f1) & !is.na(dat[[2]]$f2)
@@ -142,7 +141,7 @@ ibdEstim = function(x, ids = typedMembers(x), param = c("kappa", "delta"),
   loglik = function(p) sum(log(.pairwiseLikelihood(p, wei, param = "kappa")))
 
   # Gradient
-  weiRed = wei[c(1,3), ] - rep(wei[2, ], each = 2)
+  weiRed = wei[c(1,3), , drop = FALSE] - rep(wei[2, ], each = 2)
   grad = function(p) weiRed %*% (1/.pairwiseLikelihood(p, wei, param = "kappa"))
 
   # Optimise
@@ -161,7 +160,7 @@ ibdEstim = function(x, ids = typedMembers(x), param = c("kappa", "delta"),
 
 
 .deltaEstim = function(dat, start, reltol, returnArgs = FALSE, ...) {
-  pair = names(dat)
+  pair = names(dat) %||% c("_1", "_2")
 
   # Remove missing
   keep = !is.na(dat[[1]]$f1) & !is.na(dat[[2]]$f2)
@@ -321,12 +320,20 @@ ibdEstim = function(x, ids = typedMembers(x), param = c("kappa", "delta"),
 
   if(param == "kappa") {
 
+    # Create 3-dim version first
     if(is.null(start))
-      start = c(1/3, 1/3)
-    else if(length(start) == 3)
-      start = start[c(1,3)]
-    else if(length(start) != 2)
+      start = c(1/3, 1/3, 1/3)
+    else if(length(start) == 2)
+      start = c(start[1], 1-start, start[2])
+    else if(length(start) != 3)
       stop2("`start` must have length 2 or 3")
+
+    # If necessary, pull inside
+    if(any(start == 0))
+      start = (1 - 1e-6) * start + 1e-6 * c(1/3, 1/3, 1/3)
+
+    # Project to 2-dim and fix names
+    start = start[c(1,3)]
     names(start) = c("k0", "k2")
 
     # Region: Triangle
@@ -334,13 +341,20 @@ ibdEstim = function(x, ids = typedMembers(x), param = c("kappa", "delta"),
     ci = c(0,0,-1)
   }
   else {
-    # Start point
+    # Start point: In R^9 first
     if(is.null(start))
-      start = rep(1/9, 8)
-    else if(length(start) == 9)
-      start = start[1:8]
-    else if(length(start) != 8)
+      start = rep(1/9, 9)
+    else if(length(start) == 8)
+      start = c(start, 1-start)
+    else if(length(start) != 9)
       stop2("`start` must have length 8 or 9")
+
+    # If necessary, pull inside
+    if(any(start == 0))
+      start = (1 - 1e-6) * start + 1e-6 * rep(1/9, 9)
+
+    # Project to R^8 and fix names
+    start = start[1:8]
     names(start) = paste0("d", 1:8)
 
     # Region: unit simplex in R^8

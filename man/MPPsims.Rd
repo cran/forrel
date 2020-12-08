@@ -45,11 +45,11 @@ simple vector.}
 treated. Possible values are as follows:
 \itemize{
 \item \code{NA} (the default): Mutations are disabled only for those markers whose
-known genotypes are consistent with \code{reference}. This is determined by
+known genotypes are consistent with the pedigree. This is determined by
 temporarily removing all mutation models and checking which markers have
 nonzero likelihood.
 \item \code{TRUE}: Mutations are disabled for all markers. This will result in an
-error if any markers are inconsistent with \code{reference}.
+error if any markers are inconsistent.
 \item \code{FALSE}: No action is done to disable mutations.
 \item A vector containing the names or indices of those markers for which
 mutations should be disabled.
@@ -116,11 +116,11 @@ x = setMarkers(x, list(m, m2))
 mutmod(x, 1:2) = list("equal", rate = 0.1)
 
 # By default mutations are disabled for consistent markers
-# MPPsims(x, selections = "Father", addBaseline = FALSE)
+MPPsims(x, selections = "Father", addBaseline = FALSE)
 
 # Don't disable anything
-# MPPsims(x, selections = "Father", addBaseline = FALSE,
-#       disableMutations = FALSE)
+MPPsims(x, selections = "Father", addBaseline = FALSE,
+        disableMutations = FALSE)
 
 
 # Disable all mutation models. SHOULD GIVE ERROR FOR SECOND MARKER
