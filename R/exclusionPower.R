@@ -42,7 +42,7 @@
 #'   `exactMaxL`; remaining markers are handled by simulation.
 #' @param nsim A positive integer; the number of simulations used for markers
 #'   whose number of alleles exceeds `exactMaxL`.
-#' @param seed A numeric seed for the random number generator (optional).
+#' @param seed An integer seed for the random number generator (optional).
 #' @param alleles,afreq,Xchrom If these are given, they are used (together with
 #'   `knownGenotypes`) to create a marker object on the fly.
 #' @param knownGenotypes A list of triplets `(a, b, c)`, indicating that
@@ -160,7 +160,6 @@ exclusionPower = function(claimPed, truePed, ids, markers = NULL, source = "clai
   if(!is.list(ids))
     ids = list(ids)
   ids = lapply(ids, as.character)
-  idslabs = sapply(ids, paste, collapse = "-")
   allids = unique.default(unlist(ids))
 
   # Number of `ids` vectors
@@ -296,14 +295,14 @@ exclusionPower = function(claimPed, truePed, ids, markers = NULL, source = "clai
     # If impossible in true, return NA
     if(trueBase[i] == 0) {
       if(verbose)
-        message("  *** INCOMPATIBLE WITH TRUE PEDIGREE ***\n  -> EP = NA")
+        message("*** INCOMPATIBLE WITH TRUE PEDIGREE ***\nEP = NA")
       return(rep(NA_real_, NI))
     }
 
     # If impossible in claim, return 1
     if(claimBase[i] == 0) {
       if(verbose)
-        message("  *** INCOMPATIBLE WITH CLAIMED PEDIGREE ***\n  -> EP = 1")
+        message("*** INCOMPATIBLE WITH CLAIMED PEDIGREE ***\nEP = 1")
       return(rep(1, NI))
     }
 
@@ -325,7 +324,7 @@ exclusionPower = function(claimPed, truePed, ids, markers = NULL, source = "clai
     }
 
     if(verbose)
-      message("  -> EP = ", paste(round(this.ep, 3), collapse = " "))
+      message("EP = ", paste(round(this.ep, 3), collapse = " "))
 
     this.ep
   }, FUN.VALUE = numeric(NI))

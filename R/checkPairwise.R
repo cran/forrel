@@ -1,7 +1,7 @@
 #' Check pedigree data for relationship errors
 #'
 #' This function provides a convenient way to check for pedigree errors, given
-#' the available marker data. The function calls [IBDestimate()] to estimate IBD
+#' the available marker data. The function calls [ibdEstimate()] to estimate IBD
 #' coefficients for all pairs of typed pedigree members, and computes the
 #' likelihood ratio (LR) comparing each estimate to the coefficients implied by
 #' the pedigree. By default, the estimates are shown in a colour-coded plot
@@ -15,7 +15,7 @@
 #' @param LRthreshold A positive number (default: 1000). IBD estimates whose LR
 #'   exceed this, when compared to the coefficients implied by the pedigree, are
 #'   encircled in the plot.
-#' @param ... further parameters passed on to [ribd::ibdTriangle()].
+#' @param ... Further parameters passed on to [ribd::ibdTriangle()].
 #'
 #' @return A data frame containing both the estimated and pedigree-based IBD
 #'   coefficients for each pair of typed individuals. The last column contains
@@ -23,7 +23,7 @@
 #'   pedigree-based ones.
 #'
 #' @author Magnus Dehli Vigeland
-#' @seealso [IBDestimate()]
+#' @seealso [ibdEstimate()]
 #'
 #' @examples
 #'
@@ -54,7 +54,7 @@
 #' @export
 checkPairwise = function(x, plot = TRUE, labels = FALSE, LRthreshold = 1000, ...) {
   # Estimated coefficients
-  kEst = IBDestimate(x)
+  kEst = ibdEstimate(x, verbose = FALSE)
 
   # Pedigree coefficients
   if(is.ped(x)) {

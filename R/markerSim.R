@@ -37,7 +37,7 @@
 #' @param eliminate A non-negative integer, indicating the number of iterations
 #'   in the internal genotype-compatibility algorithm. Positive values can save
 #'   time if `partialmarker` is non-NULL and the number of alleles is large.
-#' @param seed NULL, or a numeric seed for the random number generator.
+#' @param seed An integer seed for the random number generator (optional).
 #' @param verbose A logical.
 #' @return A `ped` object equal to `x` except its `MARKERS` entry, which
 #'   consists of the `N` simulated markers.
@@ -162,7 +162,6 @@ markerSim = function(x, N = 1, ids = NULL, alleles = NULL, afreq = NULL,
 
   # Forced genotypes:
   forcedTF = (m[, 1] == 0 | m[, 2] == 0) & (lengths(gridlist) == 1)
-  m.unforced = m  # saving a copy for use in verbose output below
   for (id in (1:pedsize(x))[forcedTF])
     m[id, ] = allgenos[gridlist[[id]], ]
 
@@ -181,7 +180,7 @@ markerSim = function(x, N = 1, ids = NULL, alleles = NULL, afreq = NULL,
 
   if (loops <- x$UNBROKEN_LOOPS) {
     orig_ids = labels(x)
-    x = breakLoops(setMarkers(x, m), loop_breakers = loopBreakers, verbose = verbose)
+    x = breakLoops(setMarkers(x, m), loopBreakers = loopBreakers, verbose = verbose)
     m = x$MARKERS[[1]]
     loopBreakers = labels(x)[x$LOOP_BREAKERS[, 'orig']] # NB: LOOP_BREAKERS are internal ints
     gridlist = gridlist[sort.int(match(c(orig_ids, loopBreakers), orig_ids))]
@@ -487,7 +486,7 @@ markerSim = function(x, N = 1, ids = NULL, alleles = NULL, afreq = NULL,
 #' @param Xchrom a logical: X linked markers or not?
 #' @param mutmod a [pedmut::mutationModel()] object, i.e., list of mutation
 #'   matrices named 'female' and 'male'.
-#' @param seed NULL, or a numeric seed for the random number generator.
+#' @param seed An integer seed for the random number generator (optional).
 #' @param verbose a logical.
 #' @return a `ped` object equal to `x` in all respects except its `MARKERS`
 #'   entry, which consists of the `N` simulated markers.
@@ -633,7 +632,6 @@ simpleSim = function(x, N, alleles, afreq, ids, Xchrom = FALSE,
 .genedrop_AUT = function(x, N, nall, afreq, mutmod, seed) {
   FIDX = x$FIDX
   MIDX = x$MIDX
-  SEX = x$SEX
   FOU = founders(x, internal = TRUE)
   NONFOU = nonfounders(x, internal = TRUE)
   mutations = !is.null(mutmod)

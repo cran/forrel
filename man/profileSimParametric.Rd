@@ -11,7 +11,7 @@ profileSimParametric(
   N = 1,
   freqList = NULL,
   seed = NULL,
-  returnValue = c("singletons", "alleles", "genotypes")
+  returnValue = c("singletons", "alleles", "genotypes", "internal")
 )
 }
 \arguments{
@@ -29,7 +29,7 @@ entry gives the identity state of the corresponding marker. (See details.)}
 \item{freqList}{A list of numeric vectors. Each vector is the allele
 frequencies of a marker.}
 
-\item{seed}{NULL, or a numeric seed for the random number generator.}
+\item{seed}{An integer seed for the random number generator (optional).}
 
 \item{returnValue}{Either "singleton" (default) or "alleles". (see Value).}
 }

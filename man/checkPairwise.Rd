@@ -19,7 +19,7 @@ IBD triangle plot.}
 exceed this, when compared to the coefficients implied by the pedigree, are
 encircled in the plot.}
 
-\item{...}{further parameters passed on to \code{\link[ribd:ibdTriangle]{ribd::ibdTriangle()}}.}
+\item{...}{Further parameters passed on to \code{\link[ribd:ibdTriangle]{ribd::ibdTriangle()}}.}
 }
 \value{
 A data frame containing both the estimated and pedigree-based IBD
@@ -29,7 +29,7 @@ pedigree-based ones.
 }
 \description{
 This function provides a convenient way to check for pedigree errors, given
-the available marker data. The function calls \code{\link[=IBDestimate]{IBDestimate()}} to estimate IBD
+the available marker data. The function calls \code{\link[=ibdEstimate]{ibdEstimate()}} to estimate IBD
 coefficients for all pairs of typed pedigree members, and computes the
 likelihood ratio (LR) comparing each estimate to the coefficients implied by
 the pedigree. By default, the estimates are shown in a colour-coded plot
@@ -62,7 +62,7 @@ checkPairwise(x, labels = TRUE)
 
 }
 \seealso{
-\code{\link[=IBDestimate]{IBDestimate()}}
+\code{\link[=ibdEstimate]{ibdEstimate()}}
 }
 \author{
 Magnus Dehli Vigeland
