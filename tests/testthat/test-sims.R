@@ -49,8 +49,7 @@ test_that("profileSim() keeps marker names", {
 })
 
 test_that("profileSim() treats pedlists as expected", {
-  x = singleton(1)
-  x = setMarkers(x, marker(x, alleles = 1:5, name = "M"))
+  x = singleton(1) |> addMarker(alleles = 1:5, name = "M")
   y = relabel(x, 2)
   SEED = 777
 
@@ -73,8 +72,9 @@ expect_identical(genotype(y, id = 1, marker = 1), c("1", "2"))
 })
 
 test_that("markerSim() works in looped pedigree 1", {
-  x = addChildren(linearPed(2), 5,2,1)
-  x = setMarkers(x, marker(x, "5" = 1, alleles = 1:2, afreq = c(0.001, 0.999)))
+  x = linearPed(2) |>
+    addChildren(5,2,1) |>
+    addMarker("5" = "1/1", alleles = 1:2, afreq = c(0.001, 0.999))
 
   y = mSim(x, partialmarker = 1, seed = 123)
   expect_identical(genotype(y, id = 3, marker = 1), c("1", "2"))
@@ -82,14 +82,17 @@ test_that("markerSim() works in looped pedigree 1", {
 })
 
 test_that("markerSim() works in looped pedigree 2", {
-  x = addChildren(linearPed(2), 5,2,1)
-  x = setMarkers(x, marker(x, "6" = 1, "2" = c(0,2)))
+  x = linearPed(2) |>
+    addChildren(5,2,1) |>
+    addMarker("6" = "1/1", "2" = "0/2")
   # plot(x,1)
+
   y1 = mSim(x, partialmarker = 1)
   expect_identical(genotype(y1, id = 2, marker = 1), c("1", "2")) # Forced
 
   x = addParents(x, 2, 10, 11, verbose = FALSE)
-  x = setMarkers(x, marker(x, "6" = 1, "10" = 2))
+  x = addMarker(x, "6" = 1, "10" = 2)
+
   # plot(x,1)
   y2 = mSim(x, partialmarker = 1)
   expect_identical(genotype(y2, id = 2, marker = 1), c("1", "2")) # Forced!
@@ -99,9 +102,7 @@ test_that("markerSim() works in looped pedigree 2", {
 })
 
 test_that("markerSim() works in looped pedigree 3", {
-  x = cousinPed(0, child = T)
-  x = relabel(x, letters[1:5])
-  x = setMarkers(x, marker(x, c = 1:2))
+  x = cousinPed(0, child = T) |> relabel(new = letters[1:5]) |> addMarker(c = 1:2)
 
   y1 = mSim(x, partial = 1, loopBreaker = "c", seed = 1234)
   expect_equal(as.numeric(getAlleles(y1)), c(1,2,1,2,1,2,2,2,2,2))
