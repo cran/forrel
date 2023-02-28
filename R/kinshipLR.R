@@ -7,8 +7,8 @@
 #' 'source', from which data is transferred to all the other pedigrees.
 #'
 #' By default, all markers are assumed to be unlinked. To accommodate linkage, a
-#' genetic map should be supplied with the argument `linkageMap`. This requires
-#' the software MERLIN to be installed.
+#' genetic map may be supplied with the argument `linkageMap`. This requires the
+#' software MERLIN to be installed.
 #'
 #' @param ... Pedigree alternatives. Each argument should be either a single
 #'   `ped` object or a list of such. The pedigrees may be named; otherwise they
@@ -27,10 +27,20 @@
 #'   an error.
 #' @param markers A vector of marker names or indices indicating which markers
 #'   should be included. If NULL (the default) all markers are used.
-#' @param linkageMap Either NULL (default), or a data frame with three columns:
-#'   chromosome; marker name; centiMorgan position. If given, it signifies to
-#'   the program that the markers are linked and invokes MERLIN for computing
-#'   the likelihoods.
+#' @param linkageMap If this is non-NULL, the markers are interpreted as being
+#'   linked, and likelihoods will be computed by an external call to MERLIN.
+#'
+#'   The supplied object should be either:
+#'
+#'   * a data frame, whose first three columns must be (i) chromosome (ii)
+#'   marker name (iii) centiMorgan position, or
+#'
+#'   * a map object created with `ibdsim2::uniformMap()` or
+#'   `ibdsim2::loadMap()`. This will internally be applied to the attached
+#'   markers to produce a suitable data frame as above.
+#'
+#' @param keepMerlin Either NULL (default) or the path to an existing folder. If
+#'   given, MERLIN files are stored here, typically for debugging purposes.
 #' @param verbose A logical.
 #'
 #' @seealso [LRpower()], [pedprobr::likelihoodMerlin()]
@@ -56,6 +66,8 @@
 #' @author Magnus Dehli Vigeland and Thore Egeland
 #'
 #' @examples
+#'
+#' ### Example 1: Full vs half sibs
 #'
 #' # Simulate 5 markers for a pair of full sibs
 #' ids = c("A", "B")
@@ -85,8 +97,34 @@
 #' res$likelihoodsPerMarker
 #'
 #'
+#' ### Example 2: Separating grandparent/halfsib/uncle-nephew
+#' \donttest{
+#' # Requires ibdsim2 and MERLIN
+#' if(requireNamespace("ibdsim2", quietly = TRUE) && pedprobr::checkMerlin()) {
+#'
+#'   # Define pedigrees
+#'   ids = c("A", "B")
+#'   H = relabel(halfSibPed(),   old = c(4,5), new = ids)
+#'   U = relabel(avuncularPed(), old = c(3,6), new = ids)
+#'   G = relabel(linearPed(2),   old = c(1,5), new = ids)
+#'
+#'   # Attach FORCE panel of SNPs to G
+#'   G = setSNPs(G, FORCE[1:10, ])  # use all for better results
+#'
+#'   # Simulate recombination pattern in G
+#'   map = ibdsim2::loadMap("decode19", uniform = TRUE)   # unif for speed
+#'   ibd = ibdsim2::ibdsim(G, N = 1, ids = ids, map = map)
+#'
+#'   # Simulate genotypes conditional on pattern
+#'   G = ibdsim2::profileSimIBD(G, ibdpattern = ibd)
+#'
+#'   # Compute LR (genotypes are automatically transferred to H and U)
+#'   kinshipLR(H, U, G, linkageMap = map)
+#' }}
+#'
 #' @export
-kinshipLR = function(..., ref = NULL, source = NULL, markers = NULL, linkageMap = NULL, verbose = FALSE) {
+kinshipLR = function(..., ref = NULL, source = NULL, markers = NULL, linkageMap = NULL,
+                     keepMerlin = NULL, verbose = FALSE) {
   st = proc.time()
 
   x = list(...)
@@ -125,7 +163,7 @@ kinshipLR = function(..., ref = NULL, source = NULL, markers = NULL, linkageMap 
     cat("Reference pedigree: ", ref, "\n")
 
   if(is.null(source)) {
-    # Identity peds without marker data
+    # Identify peds without marker data
     empty = !sapply(x, hasMarkers)
 
     if(all(empty))
@@ -152,6 +190,9 @@ kinshipLR = function(..., ref = NULL, source = NULL, markers = NULL, linkageMap 
       srcPed = selectMarkers(srcPed, markers)
       markers = NULL # important!
     }
+    if(!is.null(linkageMap))
+      srcPed = lumpAlleles(srcPed, always = TRUE, verbose = verbose)
+
     x = lapply(x, transferMarkers, from = srcPed)
   }
 
@@ -161,6 +202,9 @@ kinshipLR = function(..., ref = NULL, source = NULL, markers = NULL, linkageMap 
     if(!all(nm == nm[1]))
       stop2("When `markers = NULL`, all pedigrees must have the same number of attached markers: ", nm)
     markers = seq_len(nm[1])
+  }
+  else {
+    x = lapply(x, selectMarkers, markers)
   }
 
   if(verbose)
@@ -179,25 +223,72 @@ kinshipLR = function(..., ref = NULL, source = NULL, markers = NULL, linkageMap 
 
   names(x) = hypnames
 
-  ### Linked markers: call MERLIN
+
+  # Linked markers: MERLIN ---------------------------------------------
+  if(hasLinkedMarkers(x[[1]]) && is.null(linkageMap))
+    stop2("Linked markers detected, but no `linkageMap` provided")
+
   if(!is.null(linkageMap)) {
-    if(!checkMerlin())
-      stop2("Kinship analysis with linked markers requires MERLIN to be installed")
+    if(verbose)
+      cat("\nLinkage map detected - preparing MERLIN or MINX\n")
 
-    xLumped = lapply(x, lumpAlleles, verbose = verbose)
+    if(!checkMerlin("merlin", version = FALSE, error = FALSE))
+      stop2("Kinship analysis with linked markers requires MERLIN to be installed and available in the search path")
 
-    lnLik = vapply(xLumped, function(hyp)
-      likelihoodMerlin(hyp, markers = markers, linkageMap = linkageMap,
-                       logbase = exp(1), verbose = FALSE),
-      FUN.VALUE = 1)
+    # If ibdsim recombination map, apply it to the attached markers
+    if(inherits(linkageMap, "genomeMap") || inherits(linkageMap, "chromMap")) {
+      if(!requireNamespace("ibdsim2", quietly = TRUE))
+        stop2("The supplied `linkageMap` requires the `ibdsim2` package, which seems unavailable. Install `ibdsim2` and try again.")
+      if(verbose)
+        cat("Converting attached marker positions from MB to CM\n")
 
-    LRtotal = exp(lnLik - lnLik[[refIdx]])
-    LRtotal = signif(LRtotal, 3)
+      physMap = getMap(x[[1]])
+      linkageMap = ibdsim2:::convertMap(physMap, genomeMap = linkageMap)
+    }
+
+    # Lump all peds, if not already done (a bit of a hack)
+    #if(is.null(source))
+    #  x = lapply(x, lumpAlleles, verbose = verbose)
+
+    if(!is.null(keepMerlin)) {
+      if(!dir.exists(keepMerlin))
+        stop2("`keepMerlin` must point to an existing folder: ", keepMerlin)
+      cleanup = FALSE
+      dir = keepMerlin
+    }
+    else {
+      cleanup = TRUE
+      dir = tempdir()
+    }
+
+    merlinFUN = function(x, verb)
+      likelihoodMerlin(x, markers = markers, linkageMap = linkageMap, perChrom = TRUE, logbase = exp(1),
+                       checkpath = FALSE, cleanup = cleanup, dir = dir, verbose = verb)
+
+    lnLikList = lapply(seq_along(x), function(i) merlinFUN(x[[i]], verbose && (i == 1)))
+
+    lnLikChrom = do.call(cbind, lnLikList)
+    rownames(lnLikChrom) = names(lnLikList[[1]]) # chrom labels
+
+    lnLik = colSums(lnLikChrom)
+    lnDiff = lnLik - lnLik[[refIdx]]
+    LRtotal = signif(exp(lnDiff), 3)
     names(LRtotal) = paste0(hypnames, ":", hypnames[refIdx])
 
-    return(structure(
-      list(LRtotal = LRtotal, lnLik = lnLik),
-      class = "LRresult"))
+    if(any(LRtotal == Inf & lnDiff < Inf))
+      warning("Overflow!\nOutput entries `lnLik` and `lnLikChrom` may still be informative",
+              immediate. = TRUE, call. = FALSE)
+    if(any(LRtotal == 0 & lnDiff > -Inf))
+      warning("Underflow!\nOutput entries `lnLik` and `lnLikChrom` may still be informative",
+              immediate. = TRUE, call. = FALSE)
+
+    lnDiffChrom = lnLikChrom - lnLikChrom[,refIdx]
+    LRchrom = signif(exp(lnDiffChrom), 3)
+
+    res = list(LRtotal = LRtotal, lnLik = lnLik,
+               LRchrom = LRchrom, lnLikChrom = lnLikChrom,
+               time = proc.time() - st)
+    return(structure(res, class = "LRresult"))
   }
 
   # Break all loops (NB: rapply() doesn't work here, since is.list(ped) = TRUE)
@@ -243,3 +334,4 @@ kinshipLR = function(..., ref = NULL, source = NULL, markers = NULL, linkageMap 
 print.LRresult = function(x, ...) {
   print(x$LRtotal)
 }
+

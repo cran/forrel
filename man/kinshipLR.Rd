@@ -10,6 +10,7 @@ kinshipLR(
   source = NULL,
   markers = NULL,
   linkageMap = NULL,
+  keepMerlin = NULL,
   verbose = FALSE
 )
 }
@@ -35,10 +36,20 @@ an error.}
 \item{markers}{A vector of marker names or indices indicating which markers
 should be included. If NULL (the default) all markers are used.}
 
-\item{linkageMap}{Either NULL (default), or a data frame with three columns:
-chromosome; marker name; centiMorgan position. If given, it signifies to
-the program that the markers are linked and invokes MERLIN for computing
-the likelihoods.}
+\item{linkageMap}{If this is non-NULL, the markers are interpreted as being
+linked, and likelihoods will be computed by an external call to MERLIN.
+
+The supplied object should be either:
+\itemize{
+\item a data frame, whose first three columns must be (i) chromosome (ii)
+marker name (iii) centiMorgan position, or
+\item a map object created with \code{ibdsim2::uniformMap()} or
+\code{ibdsim2::loadMap()}. This will internally be applied to the attached
+markers to produce a suitable data frame as above.
+}}
+
+\item{keepMerlin}{Either NULL (default) or the path to an existing folder. If
+given, MERLIN files are stored here, typically for debugging purposes.}
 
 \item{verbose}{A logical.}
 }
@@ -68,10 +79,12 @@ pedigrees use the same data set, one of the pedigrees may be chosen as
 }
 \details{
 By default, all markers are assumed to be unlinked. To accommodate linkage, a
-genetic map should be supplied with the argument \code{linkageMap}. This requires
-the software MERLIN to be installed.
+genetic map may be supplied with the argument \code{linkageMap}. This requires the
+software MERLIN to be installed.
 }
 \examples{
+
+### Example 1: Full vs half sibs
 
 # Simulate 5 markers for a pair of full sibs
 ids = c("A", "B")
@@ -100,6 +113,31 @@ res = kinshipLR(peds)
 res$LRperMarker
 res$likelihoodsPerMarker
 
+
+### Example 2: Separating grandparent/halfsib/uncle-nephew
+\donttest{
+# Requires ibdsim2 and MERLIN
+if(requireNamespace("ibdsim2", quietly = TRUE) && pedprobr::checkMerlin()) {
+
+  # Define pedigrees
+  ids = c("A", "B")
+  H = relabel(halfSibPed(),   old = c(4,5), new = ids)
+  U = relabel(avuncularPed(), old = c(3,6), new = ids)
+  G = relabel(linearPed(2),   old = c(1,5), new = ids)
+
+  # Attach FORCE panel of SNPs to G
+  G = setSNPs(G, FORCE[1:10, ])  # use all for better results
+
+  # Simulate recombination pattern in G
+  map = ibdsim2::loadMap("decode19", uniform = TRUE)   # unif for speed
+  ibd = ibdsim2::ibdsim(G, N = 1, ids = ids, map = map)
+
+  # Simulate genotypes conditional on pattern
+  G = ibdsim2::profileSimIBD(G, ibdpattern = ibd)
+
+  # Compute LR (genotypes are automatically transferred to H and U)
+  kinshipLR(H, U, G, linkageMap = map)
+}}
 
 }
 \seealso{

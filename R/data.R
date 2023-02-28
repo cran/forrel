@@ -84,3 +84,44 @@
 #'   Genetics Supplement Series, Volume 4 (1).
 #'
 "NorwegianFrequencies"
+
+
+#' FORCE panel kinship SNPs
+#'
+#' A data frame describing (a subset of) the FORCE panel of SNPs designed for
+#' applications in forensic genetics (Tillmar et al., 2021). The subset included
+#' here are the SNPs recommended for kinship analysis. As the original
+#' publication did not include allele frequencies, these were downloaded from
+#' Ensembl via the biomaRt package. 15 markers were removed as frequency
+#' information could not be retrieved.
+#'
+#' To attach the FORCE markers to a pedigree, use [pedtools::setSNPs()] (see
+#' Examples).
+#'
+#'
+#' @format A data frame with 3915 rows and 6 columns:
+#'
+#'   * `CHROM`: Chromosome (1-22)
+#'
+#'   * `MARKER`: Marker name (rs number)
+#'
+#'   * `MB`: Physical position in megabases (build GRCh38)
+#'
+#'   * `A1`: First allele
+#'
+#'   * `A2`: Second allele
+#'
+#'   * `FREQ1`: Allele frequency of `A1`
+#'
+#' @source Tillmar et al. The FORCE Panel: An All-in-One SNP Marker Set for
+#'   Confirming Investigative Genetic Genealogy Leads and for General Forensic
+#'   Applications. Genes. (2021)
+#'
+#' @examples
+#' x = setSNPs(nuclearPed(), snpData = FORCE)
+#' summary(x)
+#'
+#' getMap(x, markers = 1:5)
+#' getFreqDatabase(x, markers = 1:5)
+#'
+"FORCE"

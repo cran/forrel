@@ -11,6 +11,7 @@ profileSim(
   markers = NULL,
   seed = NULL,
   numCores = 1,
+  simplify1 = TRUE,
   verbose = TRUE,
   ...
 )
@@ -23,15 +24,20 @@ profileSim(
 \item{ids}{A character (or coercible to character) with ID labels indicating
 whose genotypes should be simulated.}
 
-\item{markers}{A list of marker objects, or a vector containing names or
-indices referring to markers attached to \code{x}. By default (\code{NULL}), all
-attached markers are used. The simulations will be conditional on the locus
-attributes (allele frequencies, mutation models a.s.o.) and any existing
+\item{markers}{Either a vector indicating a subset of markers attached to
+\code{x}, or a named list of frequency vectors. By default (\code{NULL}), all
+attached markers are used. If a frequency list is given, marker objects are
+created and attached to \code{x}. Simulations are conditional on the locus
+attributes (allele frequencies, mutation models, etc) and any existing
 genotypes in the indicated markers.}
 
 \item{seed}{An integer seed for the random number generator (optional).}
 
-\item{numCores}{The number of cores used for parallelisation, by default 1.}
+\item{numCores}{The number of cores to be used. The default is 1, i.e., no
+parallelisation.}
+
+\item{simplify1}{A logical, by default TRUE, removing the outer list layer
+when \code{N = 1}. See Value.}
 
 \item{verbose}{A logical, by default TRUE.}
 
@@ -42,6 +48,13 @@ A list of \code{N} objects similar to \code{x}, but with simulated genotypes.
 Any previously attached markers are replaced by the simulated profiles. If
 the indicated markers contained genotypes for some pedigree members, these
 are still present in the simulated profiles.
+
+If \code{N = 1} and \code{simplify1 = TRUE}, the outer list layer is removed, i.e.,
+\code{profileSim(..., N = 1, simplify1 = T)} is equivalent to \code{profileSim(..., N = 1, simplify1 = F)[[1]]}. This is usually the desired object in
+interactive use, and works well with piping.
+
+When using \code{profileSim()} in other functions, it is recommended to add
+\code{simplify1 = FALSE} to safeguard against issues with \code{N = 1}.
 }
 \description{
 Simulation of DNA profiles for specified pedigree members. Some pedigree
@@ -49,14 +62,22 @@ members may already be genotyped; in that case the simulation is conditional
 on these. The main work of this function is done by \code{\link[=markerSim]{markerSim()}}.
 }
 \examples{
-# Example with two brothers
+# Example pedigree with two brothers
 x = nuclearPed(children = c("B1", "B2"))
 
-# Attach two markers; one brother is already genotyped
-x = addMarker(x, B1 = "1/2", alleles = 1:3)
-x = addMarker(x, B1 = "1", alleles = 1:4, afreq = (1:4)/10, chrom = "X")
+### Simulate profiles using built-in freq database
+profileSim(x, markers = NorwegianFrequencies[1:3])
 
-# Simulate 3 profiles of B2 conditional on the above
-profileSim(x, N = 3, ids = "B2")
+### Conditioning on known genotypes for one brother
+
+# Attach two SNP markers with genotypes for B1
+y = x |>
+  addMarker(B1 = "1/2", alleles = 1:2) |>
+  addMarker(B1 = "1",   alleles = 1:2, chrom = "X")
+
+# Simulate 2 profiles of B2 conditional on the above
+profileSim(y, N = 2, ids = "B2", seed = 123)
+
+
 
 }
