@@ -10,6 +10,7 @@
 #'   included if it is present in the input file.
 #' @param Xchrom A logical. If TRUE, the `chrom` attribute of all markers will
 #'   be set to "X". (Default = FALSE.)
+#' @param prefixAdded A string used as prefix when adding missing parents.
 #' @param verbose A logical. If TRUE, various information is written to the
 #'   screen during the parsing process.
 #'
@@ -25,8 +26,9 @@
 #'   multiple pedigrees, so the output gets another layer in this case.
 #'
 #' @importFrom pedmut mutationMatrix
+#' @importFrom utils packageVersion
 #' @export
-readFam = function(famfile, useDVI = NA, Xchrom = FALSE, verbose = TRUE) {
+readFam = function(famfile, useDVI = NA, Xchrom = FALSE, prefixAdded = "added_", verbose = TRUE) {
   if(!endsWith(famfile, ".fam"))
     stop("Input file must end with '.fam'", call. = FALSE)
 
@@ -250,39 +252,49 @@ readFam = function(famfile, useDVI = NA, Xchrom = FALSE, verbose = TRUE) {
     names(frqs) = als
 
     # Mutation models
-    models = c("equal", "proportional", "stepwise", "3", "4")
+    models = c("equal", "proportional", "stepwise", "stepwise", "stepwise")
+    names(models) = c("equal", "prop", "step-unstationary", "step-stationary", "step-ext")
+
     maleMod = models[model.idx.mal + 1]
     femaleMod = models[model.idx.fem + 1]
 
-    if(maleMod %in% models[1:3]) {
-      maleMutMat = mutationMatrix(model = maleMod, alleles = als, afreq = frqs,
-                                  rate = mutrate.mal, rate2 = mutrate2.mal)
-    }
-    else {
-      if(verbose)
-        message(sprintf("*** Ignoring male mutation model '%s' ***", maleMod))
-      maleMutMat = NULL
-      unsupp = c(unsupp, maleMod)
-    }
+    maleMutMat = mutationMatrix(model = maleMod, alleles = als, afreq = frqs,
+                                rate = mutrate.mal, rate2 = mutrate2.mal, range = range.mal)
+    femaleMutMat = mutationMatrix(model = femaleMod, alleles = als, afreq = frqs,
+                                  rate = mutrate.fem, rate2 = mutrate2.fem, range = range.fem)
 
-    if(femaleMod %in% models[1:3]) {
-      femaleMutMat = mutationMatrix(model = femaleMod, alleles = als, afreq = frqs,
-                                    rate = mutrate.fem, rate2 = mutrate2.fem)
-    }
-    else {
-      if(verbose)
-        message(sprintf("*** Ignoring female mutation model '%s' ***", femaleMod))
-      femaleMutMat = NULL
-      unsupp = c(unsupp, femaleMod)
+    if("step-stationary" %in% c(names(maleMod), names(femaleMod))) {
+      if(packageVersion("pedmut") > 0.5) {
+        if(names(maleMod) == "step-stationary")
+          maleMutMat = pedmut::stabilize(maleMutMat, method = "PM")
+        if(names(femaleMod) == "step-stationary")
+          femaleMutMat = pedmut::stabilize(femaleMutMat, method = "PM")
+      }
+      else
+        warning("Please update the `pedmut` package to enable stabilization of mutation models",
+                immediate. = FALSE, call. = FALSE)
     }
 
     # Print locus summary
-    if(maleMod == femaleMod && mutrate.fem == mutrate.mal)
-      mut_txt = sprintf("model = %s, rate = %.2g (unisex)", maleMod, mutrate.mal)
-    else
-      mut_txt = sprintf("male model = %s, male rate = %.2g, female model = %s, female rate = %.2g",
-                         maleMod, mutrate.mal, femaleMod, mutrate.fem)
-    if(verbose) message(sprintf("  %s: %d alleles, %s", loc.name, length(frqs), mut_txt))
+    if(verbose) {
+      if(identical(maleMutMat, femaleMutMat)) {
+        mut_txt = sprintf("unisex mut model = %s, rate = %.2g", names(maleMod), mutrate.mal)
+        if(maleMod == "stepwise")
+          mut_txt = paste0(mut_txt, sprintf(", range = %.2g, rate2 = %.2g", range.mal, mutrate2.mal))
+      }
+      else {
+        mut_txt = sprintf("mut model (M/F) = %s/%s, rate = %.2g/%.2g",
+                           names(maleMod), names(femaleMod), mutrate.mal, mutrate.fem)
+        if(maleMod == "stepwise" && femaleMod == "stepwise")
+          mut_txt = paste0(mut_txt, sprintf(", range = %.2g/%.2g, rate2 = %.2g/%.2g",
+                                            range.mal, range.fem, mutrate2.mal, mutrate2.fem))
+        else if(maleMod == "stepwise")
+          mut_txt = paste0(mut_txt, sprintf(", range = %.2g, rate2 = %.2g", range.mal, mutrate2.mal))
+        else if(femaleMod == "stepwise")
+          mut_txt = paste0(mut_txt, sprintf(", range = %.2g, rate2 = %.2g", range.fem, mutrate2.fem))
+      }
+      message(sprintf("  %s: %d alleles, %s", loc.name, length(frqs), mut_txt))
+    }
 
     # Collect locus info
     loci[[i]] = list(locusname = loc.name, alleles = frqs,
@@ -296,11 +308,11 @@ readFam = function(famfile, useDVI = NA, Xchrom = FALSE, verbose = TRUE) {
   }
 
   # Warn about unsupported mutation models
-  if(length(unsupp) > 0) {
-    unsupp = sort(unique.default(unsupp))
-    tmp ="Some mutation models were set to NULL. Model '%s' is not supported yet."
-    warning(paste0(sprintf(tmp, unsupp), collapse = "\n"), call. = FALSE)
-  }
+  #if(length(unsupp) > 0) {
+  #  unsupp = sort(unique.default(unsupp))
+  #  tmp ="Some mutation models were set to NULL. Model '%s' is not supported yet."
+  #  warning(paste0(sprintf(tmp, unsupp), collapse = "\n"), call. = FALSE)
+  #}
 
 
   ###########
@@ -323,7 +335,7 @@ readFam = function(famfile, useDVI = NA, Xchrom = FALSE, verbose = TRUE) {
       message("\nConverting to `ped` format")
     res = lapply(dvi.families, function(fam) {
       Familias2ped(familiasped = fam$pedigrees, datamatrix = fam$datamatrix,
-                   loci = loci, matchLoci = TRUE)
+                   loci = loci, matchLoci = TRUE, prefixAdded = prefixAdded)
     })
 
     # Set all chrom attributes to X if indicated
@@ -373,7 +385,8 @@ readFam = function(famfile, useDVI = NA, Xchrom = FALSE, verbose = TRUE) {
   if(!is.null(pedigrees)) {
     if(verbose)
       message("\nConverting to `ped` format")
-    res = Familias2ped(familiasped = pedigrees, datamatrix = datamatrix, loci = loci)
+    res = Familias2ped(familiasped = pedigrees, datamatrix = datamatrix, loci = loci,
+                       prefixAdded = prefixAdded)
 
     # Set all chrom attributes to X if indicated
     if(Xchrom) {
