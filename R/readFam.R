@@ -37,10 +37,11 @@ readFam = function(famfile, useDVI = NA, Xchrom = FALSE, prefixAdded = "added_",
   x = gsub("\\\"", "", raw)
 
   # Utility function for checking integer values
-  checkInt = function(a, line, txt, value) {
-    if(!is.na(a)) return()
-    stop(sprintf('Expected line %d to be %s, but found: "%s"',
-                 line, txt, x[line]), call. = FALSE)
+  getInt = function(line, txt, value = x[line], max = Inf) {
+    if(is.na(j <- suppressWarnings(as.integer(value))) || j > max)
+      stop(sprintf('Expected line %d to be %s, but found: "%s"',
+                   line, txt, value), call. = FALSE)
+    j
   }
 
   # Read and print Familias version
@@ -60,8 +61,7 @@ readFam = function(famfile, useDVI = NA, Xchrom = FALSE, prefixAdded = "added_",
 
   # Number of individuals
   nid.line = if(x[4] != "") 4 else 5
-  nid = as.integer(x[nid.line]) # Number of persons involved in pedigrees (but excluding "extras")
-  checkInt(nid, nid.line, "number of individuals")
+  nid = getInt(nid.line, "number of individuals") # all excluding "extras"
   if(verbose)
     message("\nNumber of individuals (excluding 'extras'): ", nid)
 
@@ -78,9 +78,7 @@ readFam = function(famfile, useDVI = NA, Xchrom = FALSE, prefixAdded = "added_",
     id[i] = x[id.line]
     sex[i] = ifelse(x[id.line + 4] == "#TRUE#", 1, 2)
 
-    nmi = as.integer(x[id.line + 5])
-    checkInt(nmi, id.line + 5,
-             sprintf('number of genotypes for "%s"', id[i]))
+    nmi = getInt(id.line + 5, sprintf('number of genotypes for "%s"', id[i]))
     if(verbose)
       message(sprintf("  Individual '%s': Genotypes for %d markers read", id[i], nmi))
 
@@ -128,8 +126,7 @@ readFam = function(famfile, useDVI = NA, Xchrom = FALSE, prefixAdded = "added_",
   }
 
   # Initialise list of final pedigrees
-  nPed = as.integer(x[rel.line])
-  checkInt(nPed, "number of pedigrees")
+  nPed = getInt(rel.line, "number of pedigrees")
   if(verbose)
     message("\nNumber of pedigrees: ", nPed)
 
@@ -192,15 +189,20 @@ readFam = function(famfile, useDVI = NA, Xchrom = FALSE, prefixAdded = "added_",
     }
   }
 
-  has.probs = x[ped.line] == "#TRUE#"
+  has.probs = startsWith(x[ped.line], "#TRUE#")
   if(has.probs)
     stop("\nThis file includes precomputed probabilities; this is not supported yet.")
 
   ### Database ###
 
+  # Theta?
+  patt = "(?<=Theta/Kinship/Fst:).*(?=\\))"
+  theta = suppressWarnings(as.numeric(regmatches(x[ped.line], regexpr(patt, x[ped.line], perl = T))))
+  if(length(theta) && !is.na(theta) && theta > 0)
+    warning("Nonzero theta correction detected: theta = ", theta, call. = FALSE)
+
   db.line = ped.line + 1
-  nLoc = as.integer(x[db.line])
-  checkInt(nLoc, "number of loci")
+  nLoc = getInt(db.line, "number of loci")
 
   has.info = x[db.line + 1] == "#TRUE#"
   if(verbose) {
@@ -216,16 +218,13 @@ readFam = function(famfile, useDVI = NA, Xchrom = FALSE, prefixAdded = "added_",
   loci = vector("list", nLoc)
   loc.line = db.line + 2 + has.info
 
-  # Storage for unsupported mutation models
-  unsupp = character()
-
-
+  # Loop over database loci
   for(i in seq_len(nLoc)) {
     loc.name = x[loc.line]
     mutrate.fem = as.numeric(x[loc.line + 1])
     mutrate.mal = as.numeric(x[loc.line + 2])
-    model.idx.fem = as.integer(x[loc.line + 3])
-    model.idx.mal = as.integer(x[loc.line + 4])
+    model.idx.fem = getInt(loc.line + 3, "an integer code (0-4) for the female mutation model", max = 4)
+    model.idx.mal = getInt(loc.line + 4, "an integer code (0-4) for the male mutation model", max = 4)
 
     nAll.with.silent = as.integer(x[loc.line + 5]) # includes silent allele
 
@@ -242,13 +241,48 @@ readFam = function(famfile, useDVI = NA, Xchrom = FALSE, prefixAdded = "added_",
 
     # Number of alleles except the silent
     nAll = x[loc.line + 12]
-    nAll = as.integer(strsplit(nAll, "\t")[[1]][[1]])
-    checkInt(nAll, sprintf('number of alleles for marker "%s"', loc.name))
+    nAll = getInt(loc.line + 12, value = strsplit(nAll, "\t")[[1]][[1]],
+                  paste("number of alleles for marker", loc.name))
 
     # Read alleles and freqs
     als.lines = seq(loc.line + 13, by = 2, length.out = nAll)
     als = x[als.lines]
     frqs = as.numeric(x[als.lines + 1])
+
+    if("0" %in% als) {
+      warning(sprintf("Database error, locus %s: Illegal allele '0'. Changed to 'z'.", loc.name), call. = FALSE)
+      als[als == "0"] = "z"
+    }
+
+    # Check for illegal alleles, including "Rest allele", with stepwise models
+    if(model.idx.mal > 1 || model.idx.fem > 1) {
+      change = FALSE
+      alsNum = suppressWarnings(as.numeric(als))
+      if(any(is.na(alsNum))) {
+        change = TRUE
+        warning(sprintf("Database error, locus %s: Non-numerical allele '%s' incompatible with stepwise model. Changed to proportional model.",
+                        loc.name, als[is.na(alsNum)][1]), call. = FALSE)
+      }
+      else if(any(alsNum < 1)) {
+        change = TRUE
+        warning(sprintf("Database error, locus %s: Allele '%s' incompatible with stepwise model. Changed to proportional model.",
+                        loc.name, als[alsNum < 1][1]), call. = FALSE)
+      }
+      else {
+        badMicro = round(alsNum, 1) != alsNum
+        if(any(badMicro)) {
+          change = TRUE
+          warning(sprintf("Database error, locus %s: Illegal microvariant '%s'. Changed to proportional model.",
+                          loc.name, als[badMicro][1]), call. = FALSE)
+        }
+      }
+      if(change) {
+        if(model.idx.mal > 1) model.idx.mal = 1
+        if(model.idx.fem > 1) model.idx.fem = 1
+      }
+    }
+
+    # After checks, associate alleles with freqs
     names(frqs) = als
 
     # Mutation models
@@ -283,11 +317,14 @@ readFam = function(famfile, useDVI = NA, Xchrom = FALSE, prefixAdded = "added_",
           mut_txt = paste0(mut_txt, sprintf(", range = %.2g, rate2 = %.2g", range.mal, mutrate2.mal))
       }
       else {
-        mut_txt = sprintf("mut model (M/F) = %s/%s, rate = %.2g/%.2g",
-                           names(maleMod), names(femaleMod), mutrate.mal, mutrate.fem)
-        if(maleMod == "stepwise" && femaleMod == "stepwise")
-          mut_txt = paste0(mut_txt, sprintf(", range = %.2g/%.2g, rate2 = %.2g/%.2g",
-                                            range.mal, range.fem, mutrate2.mal, mutrate2.fem))
+        mod = if(names(maleMod) == names(femaleMod)) names(maleMod) else paste(names(maleMod), names(femaleMod), sep = "/")
+        rate = if(mutrate.mal == mutrate.fem) sprintf("%.2g", mutrate.mal) else sprintf("%.2g/%.2g", mutrate.mal, mutrate.fem)
+        mut_txt = sprintf("mut model (M/F) = %s, rate = %s", mod, rate)
+        if(maleMod == "stepwise" && femaleMod == "stepwise") {
+          range = if(range.mal == range.fem) sprintf("%.2g", range.mal) else sprintf("%.2g/%.2g", range.mal, range.fem)
+          rate2 = if(mutrate2.mal == mutrate2.fem) sprintf("%.2g", mutrate2.mal) else sprintf("%.2g/%.2g", mutrate2.mal, mutrate2.fem)
+          mut_txt = paste0(mut_txt, sprintf(", range = %s, rate2 = %s", range, rate2))
+        }
         else if(maleMod == "stepwise")
           mut_txt = paste0(mut_txt, sprintf(", range = %.2g, rate2 = %.2g", range.mal, mutrate2.mal))
         else if(femaleMod == "stepwise")
@@ -306,13 +343,6 @@ readFam = function(famfile, useDVI = NA, Xchrom = FALSE, prefixAdded = "added_",
     # Goto next locus
     loc.line = loc.line + 13 + 2*nAll
   }
-
-  # Warn about unsupported mutation models
-  #if(length(unsupp) > 0) {
-  #  unsupp = sort(unique.default(unsupp))
-  #  tmp ="Some mutation models were set to NULL. Model '%s' is not supported yet."
-  #  warning(paste0(sprintf(tmp, unsupp), collapse = "\n"), call. = FALSE)
-  #}
 
 
   ###########
