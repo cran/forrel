@@ -11,6 +11,9 @@
 #' @param Xchrom A logical. If TRUE, the `chrom` attribute of all markers will
 #'   be set to "X". (Default = FALSE.)
 #' @param prefixAdded A string used as prefix when adding missing parents.
+#' @param fallbackModel Either "equal" or "proportional"; the mutation model to
+#'   be applied (with the same overall rate) when a specified model fails for
+#'   some reason. Default: "equal".
 #' @param verbose A logical. If TRUE, various information is written to the
 #'   screen during the parsing process.
 #'
@@ -26,9 +29,9 @@
 #'   multiple pedigrees, so the output gets another layer in this case.
 #'
 #' @importFrom pedmut mutationMatrix
-#' @importFrom utils packageVersion
 #' @export
-readFam = function(famfile, useDVI = NA, Xchrom = FALSE, prefixAdded = "added_", verbose = TRUE) {
+readFam = function(famfile, useDVI = NA, Xchrom = FALSE, prefixAdded = "added_",
+                   fallbackModel = c("equal", "proportional"), verbose = TRUE) {
   if(!endsWith(famfile, ".fam"))
     stop("Input file must end with '.fam'", call. = FALSE)
 
@@ -195,6 +198,8 @@ readFam = function(famfile, useDVI = NA, Xchrom = FALSE, prefixAdded = "added_",
 
   ### Database ###
 
+  fallbackModel = match.arg(fallbackModel)
+
   # Theta?
   patt = "(?<=Theta/Kinship/Fst:).*(?=\\))"
   theta = suppressWarnings(as.numeric(regmatches(x[ped.line], regexpr(patt, x[ped.line], perl = T))))
@@ -260,25 +265,24 @@ readFam = function(famfile, useDVI = NA, Xchrom = FALSE, prefixAdded = "added_",
       alsNum = suppressWarnings(as.numeric(als))
       if(any(is.na(alsNum))) {
         change = TRUE
-        warning(sprintf("Database error, locus %s: Non-numerical allele '%s' incompatible with stepwise model. Changed to proportional model.",
-                        loc.name, als[is.na(alsNum)][1]), call. = FALSE)
+        warning(sprintf("Database error, locus %s: Non-numerical allele '%s' incompatible with stepwise model. Changed to '%s' model.",
+                        loc.name, als[is.na(alsNum)][1], fallbackModel), call. = FALSE)
       }
       else if(any(alsNum < 1)) {
         change = TRUE
-        warning(sprintf("Database error, locus %s: Allele '%s' incompatible with stepwise model. Changed to proportional model.",
-                        loc.name, als[alsNum < 1][1]), call. = FALSE)
+        warning(sprintf("Database error, locus %s: Allele '%s' incompatible with stepwise model. Changed to '%s' model.",
+                        loc.name, als[alsNum < 1][1], fallbackModel), call. = FALSE)
       }
       else {
         badMicro = round(alsNum, 1) != alsNum
         if(any(badMicro)) {
           change = TRUE
-          warning(sprintf("Database error, locus %s: Illegal microvariant '%s'. Changed to proportional model.",
-                          loc.name, als[badMicro][1]), call. = FALSE)
+          warning(sprintf("Database error, locus %s: Illegal microvariant '%s'. Changed to '%s' mutation model.",
+                          loc.name, als[badMicro][1], fallbackModel), call. = FALSE)
         }
       }
       if(change) {
-        if(model.idx.mal > 1) model.idx.mal = 1
-        if(model.idx.fem > 1) model.idx.fem = 1
+        model.idx.mal = model.idx.fem = switch(fallbackModel, equal = 0, proportional = 1)
       }
     }
 
@@ -297,17 +301,10 @@ readFam = function(famfile, useDVI = NA, Xchrom = FALSE, prefixAdded = "added_",
     femaleMutMat = mutationMatrix(model = femaleMod, alleles = als, afreq = frqs,
                                   rate = mutrate.fem, rate2 = mutrate2.fem, range = range.fem)
 
-    if("step-stationary" %in% c(names(maleMod), names(femaleMod))) {
-      if(packageVersion("pedmut") > 0.5) {
-        if(names(maleMod) == "step-stationary")
-          maleMutMat = pedmut::stabilize(maleMutMat, method = "PM")
-        if(names(femaleMod) == "step-stationary")
-          femaleMutMat = pedmut::stabilize(femaleMutMat, method = "PM")
-      }
-      else
-        warning("Please update the `pedmut` package to enable stabilization of mutation models",
-                immediate. = FALSE, call. = FALSE)
-    }
+    if(names(maleMod) == "step-stationary")
+      maleMutMat = pedmut::stabilize(maleMutMat, method = "PM")
+    if(names(femaleMod) == "step-stationary")
+      femaleMutMat = pedmut::stabilize(femaleMutMat, method = "PM")
 
     # Print locus summary
     if(verbose) {

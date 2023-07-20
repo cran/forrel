@@ -1,6 +1,6 @@
-430e8a3b46a9f60f8082a78f6135423c *DESCRIPTION
-e4f96c5b21fa4614aeeee3f1755d88f8 *NAMESPACE
-5bc423332adad06dbff5db47ce898edc *NEWS.md
+2887b7eae55dbb2cea169280e7fac21a *DESCRIPTION
+851be710d63bb737c8419d1247924221 *NAMESPACE
+660e7d810ba4a260b79bf7c485cc0dfa *NEWS.md
 62bcf8a11d715b6eeafc7b7127f72b29 *R/IBDtriangle.R
 2bb38837758839fa68070f7421669331 *R/LRpower.R
 b143c35604379d63f938a9f1badd21d4 *R/MPPsims.R
@@ -9,7 +9,7 @@ b143c35604379d63f938a9f1badd21d4 *R/MPPsims.R
 26b1d622efe9a254f8793cd0007934b1 *R/exclusionPower.R
 8c4262411e7f17e86c9aeaba551648f8 *R/expectedLR.R
 229d51e80a8573fa0945b5e9a26d05ac *R/familias2ped.R
-b6b94ab327687afa4f7521b107f14ce4 *R/findExclusions.R
+3dd8a5a365ce6ccbeb6929f94583e85e *R/findExclusions.R
 d88010d8a5f08e7744be360361d05d25 *R/forrel-package.R
 c7ca4c6912c7e97f8a5bdb24cd8698f1 *R/ibdBootstrap.R
 2ce0a0135ddf13372834e479d5338a54 *R/ibdEstimTools.R
@@ -24,10 +24,11 @@ f9b7255e239d4223a858366ded89ca87 *R/kinshipLR.R
 942127b6b249b43443004d7bf2151285 *R/powerPlot.R
 440b4b3303f3447058689f2de68285b6 *R/profileSim.R
 5a291e5623442fa6e9ef3b3626810954 *R/randomPersonEP.R
-1d416f0f11cb5a5e8ea48bd1a7b7dd8b *R/readFam.R
+5d5812329c2b55ffe2a4ea9afa0c65c6 *R/readFam.R
 bf91841cba0fecff706fa16c6a8ab5a8 *R/utils.R
+ba577189f0b838960e8a7218c2659949 *R/writeFam.R
 e3d11de186995e5d45031549fd4ac4df *README.md
-f01682ffd9d5582c0d3b8a226f3c2b16 *build/partial.rdb
+2836b2c5db38c9819380bd093383d89d *build/partial.rdb
 914105166287bf9dae50ddb6dc59d32f *data/FORCE.rda
 5130d93ae5c081cd5b9a83319f55fb47 *data/NorwegianFrequencies.rda
 3e1ee967b578e1fa8832d5594013881d *man/FORCE.Rd
@@ -57,9 +58,10 @@ d458e4a61a42c5d4c90b8ae1d5d807a8 *man/powerPlot.Rd
 ecf4f3be581eaba8442c2d405be1d628 *man/profileSim.Rd
 a82661a9f849961bde91105bb1dbcb09 *man/profileSimParametric.Rd
 1f77360c942ee49ccbdcabe3b61e528a *man/randomPersonEP.Rd
-9504e697fe5c679e6dbe0626a1565a48 *man/readFam.Rd
+6c0c053b0a13b1760a032a94dee9e49e *man/readFam.Rd
 7b380804ae05c327a6ef179de22c6e97 *man/showInTriangle.Rd
 b7b71b99ffa6488ce16b97f913f50c53 *man/simpleSim.Rd
+8bff74e03651c7fa39a98743a2bede56 *man/writeFam.Rd
 f2fb7148b5d8940d4b6b609264c8b6ae *tests/testthat.R
 33f0cde7abe025ff9b6f3816e3dce2cc *tests/testthat/test-exclusion.R
 bcfc8223d5becb4f954687ab5dc0cb84 *tests/testthat/test-familias.R
