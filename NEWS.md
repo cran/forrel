@@ -1,3 +1,33 @@
+# forrel 1.7.0
+
+## New features
+
+* The function `checkPairwise()` has undergone substantial revision, with plots implemented in both **ggplot2** and **plotly** in addition to the default base plot. A summary of the main changes are:
+    - a new argument `plotType` can be either "base" (default), "ggplot" or "plotly"
+    - the plotting is now done in a separate function `plotCP()` which is also exported
+    - a new argument `ids`, which when given restricts the checks to those individuals
+    - the output column `LR` is renamed to `GLR` (generalised likelihood ratio)
+    - new output column `pedrel` describing (in words) each relationship according to the pedigree. The descriptions are obtained with the **verbalisr** package
+    - estimation of P-values for each pairwise relationship, by parametric bootstrap simulations. This feature is controlled through new arguments `nsim`, `pvalThreshold` and `seed`. By default `nsim = 0`, meaning that no simulations are performed. The P-values are stored in the output column `pval`.
+
+
+* New function `quickLR()` performs the most common kinship tests (paternity and sibship) for a pair of individuals. 
+
+* New function `ibdLoglik()` computes the pairwise likelihood for given set IBD coefficients (kappa or delta).
+
+* Improved progress bars using the `pbapply` package.
+
+## Other
+
+* Removed (long deprecated) `IBDtriangle()`, replaced by `ribd::ibdTriangle()`.
+
+* Improved `missingPersonPlot()` appearance.
+
+* In `ibdEstimate()`, more efficient data prep, and better removal of missing data.
+
+* Refresh code in examples.
+
+
 # forrel 1.6.1
 
 * Functions facilitating interaction with the Familias software have been moved to a dedicated package, **pedFamilias**. However, `readFam()` and `writeFam()` will continue to be re-exported from **forrel** for some time.

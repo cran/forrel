@@ -38,7 +38,8 @@ rst = function(v, digits = 3)
   if(is.null(x)) y else x
 }
 
-pluralise = function(noun, n) {
+pluralise = function(noun = "", n) {
+  if(missing(n)) return(pluralise("", noun))
   if(n == 1) noun else sprintf("%ss", noun)
 }
 
@@ -54,6 +55,11 @@ pluralise = function(noun, n) {
 #random 0/1 vector of length n.
 .rand01 = function(n) {
   sample.int(2, size = n, replace = TRUE) - 1L
+}
+
+.setnames = function(x, nms) {
+  names(x) = nms
+  x
 }
 
 
@@ -165,3 +171,16 @@ fixAllelesAndFreqs = function(alleles = NULL, afreq = NULL,
   # Return ordered, named frequencies
   afreq[ord]
 }
+
+
+# TODO: Remove the following
+
+#' Add points to the IBD triangle
+#'
+#' This function is re-exported from the `ribd` package. For documentation see
+#' [ribd::showInTriangle()].
+#'
+#' @importFrom ribd showInTriangle
+#' @name showInTriangle
+#' @export
+NULL

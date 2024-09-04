@@ -32,8 +32,7 @@
 #'   to characters, and must match uniquely against the ID labels of `x`. By
 #'   default, all pairs of genotyped members of `x` are included.
 #' @param markers A vector with names or indices of markers attached to x,
-#'   indicating which markers to include. By default, all markers are
-#'   used.
+#'   indicating which markers to include. By default, all markers are used.
 #' @param param Either "kappa" (default) or "delta"; indicating which set of
 #'   coefficients should be estimated.
 #' @param start A probability vector (i.e., with nonnegative entries and sum 1)
@@ -48,6 +47,8 @@
 #' @param levels (Only relevant if `contourPlot = TRUE`.) A numeric vector of
 #'   levels at which to draw contour lines. If NULL (default), the levels are
 #'   chosen automatically.
+#' @param maxval A logical. If TRUE, the maximum log-likelihood value is
+#'   included in the output. Default: FALSE
 #' @param verbose A logical.
 #'
 #' @return An object of class `ibdEst`, which is basically a data frame with
@@ -55,6 +56,7 @@
 #'   "delta"`). The first three columns are `id1` (label of first individual),
 #'   `id2` (label of second individual) and `N` (the number of markers with no
 #'   missing alleles). The remaining columns contain the coefficient estimates.
+#'   If `maxval = T`, a column named `maxloglik` is added at the end.
 #'
 #' @author Magnus Dehli Vigeland
 #'
@@ -102,7 +104,7 @@
 ibdEstimate = function(x, ids = typedMembers(x), param = c("kappa", "delta"),
                        markers = NULL, start = NULL, tol = sqrt(.Machine$double.eps),
                        beta = 0.5, sigma = 0.5, contourPlot = FALSE, levels = NULL,
-                       verbose = TRUE) {
+                       maxval = FALSE, verbose = TRUE) {
   st = Sys.time()
   param = match.arg(param)
 
@@ -126,7 +128,7 @@ ibdEstimate = function(x, ids = typedMembers(x), param = c("kappa", "delta"),
     stop2("Untyped pedigree member: ", setdiff(allids, typedMembers(x)))
 
   # Alleles and frequencies
-  alleleData = .getAlleleData2(x, ids = allids)
+  alleleData = .prepAlleleData(x, ids = allids)
 
   # Start point
   if(is.null(start))
@@ -158,6 +160,11 @@ ibdEstimate = function(x, ids = typedMembers(x), param = c("kappa", "delta"),
   res = structure(data.frame(ids, N, coefs),
                   names = c("id1", "id2", "N", if(param == "kappa") paste0("k", 0:2) else paste0("d", 1:9)),
                   class = c("ibdEst", "data.frame"))
+
+  if(maxval) {
+    ml = do.call(rbind, lapply(resList, function(r) r$loglik))
+    res = cbind(res, maxloglik = ml)
+  }
 
   if(contourPlot) {
     if(param == "delta")
@@ -196,16 +203,15 @@ as.double.ibdEst = function(x, ...) {
 .PGD = function(dat = NULL, param, start, tol = sqrt(.Machine$double.eps),
                 beta = 0.5, sigma = 0.5, maxit = 500, x = NULL, ids = NULL, verbose = FALSE) {
 
-  # Simplify running this function on its own, with `x` and `ids` (for debugging purposes)
-  if(is.null(dat))
-    dat = .getAlleleData2(x, ids = ids)
-
+  # Names (for output)
   pair = names(dat) %||% c("_1", "_2")
 
-  # Remove missing
-  keep = !is.na(dat[[1]]$f1) & !is.na(dat[[2]]$f2)
-  if(!all(keep))
-    dat = list(lapply(dat[[1]], `[`, keep), lapply(dat[[2]], `[`, keep))
+  # Simplify running this function on its own, with `x` and `ids` (for debugging purposes)
+  if(is.null(dat))
+    dat = .prepAlleleData(x, ids = ids)
+
+  # Remove markers with missing data
+  dat = .removeMissing(dat)
 
   # Coordinate-wise likelihoods: P(G_j | IBD = i)
   wei = .likelihoodWeights(dat, param = param)
@@ -238,7 +244,7 @@ as.double.ibdEst = function(x, ...) {
     k = k + 1
 
     ARMIJO = function(y) {
-      LHS = loglik(y)
+      LHS = loglik(y, grad = FALSE)
       RHS = ll + sigma * as.numeric(gr %*% (y - xk))
       if(verbose)
         message("Armijo: y = ", rst(y,5), "; LHS = ", rst(LHS,5), "; Diff = ", LHS - RHS)
@@ -296,7 +302,7 @@ as.double.ibdEst = function(x, ...) {
   #res = data.frame(id1 = pair[1], id2 = pair[2], N = sum(keep), rbind(xk), row.names = NULL)
   #names(res)[-(1:3)] = switch(param, kappa = paste0("k", 0:2), delta = paste0("d", 1:9))
 
-  list(estimate = xk, loglik = LL$loglik, iterations = k, ids = pair, nMarkers = sum(keep))
+  list(estimate = xk, loglik = LL$loglik, iterations = k, ids = pair, nMarkers = length(dat[[1]][[1]]))
 }
 
 
@@ -311,31 +317,23 @@ contoursKappaML = function(x, ids, peak = NA, levels = NULL) {
   if(length(ids) != 2)
     stop2("Contour plots require `ids` to be a single pair of individuals")
 
-  dat = .getAlleleData2(x, ids = ids)
-
   if(isTRUE(is.na(peak))) {
     peak = ibdEstimate(x, ids, param = "kappa", verbose = FALSE)
     peak = c(peak$k0, peak$k2)
   }
 
-  # Remove missing
-  keep = !is.na(dat[[1]]$f1) & !is.na(dat[[2]]$f2)
-  if(!all(keep))
-    dat = list(lapply(dat[[1]], `[`, keep), lapply(dat[[2]], `[`, keep))
-
-  # Coordinate-wise likelihoods: P(G_j | IBD = i)
-  wei = .likelihoodWeights(dat, param = "kappa")
-
   # Log-likelihood function: Input full-dimensional kappa
-  loglik = function(k0, k2) sum(log(as.numeric(c(k0, 1 - k0 - k2, k2) %*% wei)))
+  loglik = ibdLoglikFUN(x, ids, input = "kappa")
 
   n = 51
   k0 = seq(0, 1, length.out = n)
   k2 = seq(0, 1, length.out = n)
 
   loglikMat = matrix(NA_real_, ncol = n, nrow = n)
-  for(i in 1:n) for(j in seq_len(n-i))
-    loglikMat[i,j] = loglik(k0[i], k2[j])
+  for(i in 1:n) for(j in seq_len(n-i)) {
+    kap = c(k0[i], 1 - k0[i] - k2[j], k2[j])
+    loglikMat[i,j] = loglik(kap)
+  }
 
   if(is.null(levels)) {
     ll = as.numeric(loglikMat)
@@ -367,3 +365,17 @@ contoursKappaML = function(x, ids, peak = NA, levels = NULL) {
 
 add = function(v, col = 2, pch = 16) points(v[1], v[3], col = col, pch = pch)
 
+
+# Efficient version directly from allele data, e.g. output from
+# `profileSimParametric(...,  returnValue = "alleles")`
+# NB: Used in `ibdBootstrap()`
+.ibdEstimFromAlleles = function(als, freqList, param, start = NULL, returnValue = "estimate", ...) {
+  # als: list of 4 vectors with true (not internal) alleles
+  # freqList: List like `NorwegianFrequencies`
+
+  # Prepare for estimation
+  dat = .prepAlleleData2(als, freqList)
+
+  res = .PGD(dat, param = param, start = start, ...)
+  if(is.null(returnValue)) res else res[[returnValue]]
+}

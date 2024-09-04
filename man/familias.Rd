@@ -3,29 +3,16 @@
 \name{familias}
 \alias{familias}
 \alias{readFam}
-\alias{writeFam}
-\alias{openFamilias}
-\alias{Familias2ped}
-\alias{readFamiliasLoci}
 \title{Import/export from Familias}
 \usage{
 readFam(...)
-
-writeFam(...)
-
-openFamilias(...)
-
-Familias2ped(...)
-
-readFamiliasLoci(...)
 }
 \arguments{
 \item{...}{Arguments passed on to the respective \code{pedFamilias} function.}
 }
 \description{
-Functions for reading and writing .fam files associated with the Familias
-software for forensic kinship computations, and for converting objects from
-the R package \code{Familias} into the \code{pedsuite}.
+Functions for reading .fam files associated with the Familias
+software for forensic kinship computations.
 
 \emph{\strong{Deprecated}} These functions have been moved to a separate package,
 \code{pedFamilias}, and will be removed from \code{forrel} in a future version.
