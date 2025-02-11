@@ -1,3 +1,14 @@
+# forrel 1.7.1
+
+* New argument `acrossComps` in `ibdEstimate()` and `checkParwise()`.
+
+* `readFam()` is no longer exported from forrel; see `pedFamilias::readFam()`.
+
+* Minor improvements and bug fixes in `checkPairwise()`.
+
+* Minor updates of README and docs.
+
+
 # forrel 1.7.0
 
 ## New features
@@ -43,7 +54,7 @@
 
 * New function `writeFam()`.
 
-* `readFam()` gains argument `fallbackModel` to be applied if the function encounters unrecognisable mutation models in the .fam file.
+* `readFam()` gains argument `fallbackModel` to be applied if the function encounters unrecognisable mutation models in the `.fam` file.
 
 ## Other
 
