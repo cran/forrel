@@ -1,7 +1,7 @@
 Type: Package
 Package: forrel
 Title: Forensic Pedigree Analysis and Relatedness Inference
-Version: 1.7.1
+Version: 1.8.0
 Authors@R: c(
     person("Magnus Dehli", "Vigeland", , "m.d.vigeland@medisin.uio.no", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-9134-4962")),
@@ -21,8 +21,8 @@ Description: Forensic applications of pedigree analysis, including
 License: GPL (>= 2)
 URL: https://github.com/magnusdv/forrel
 BugReports: https://github.com/magnusdv/forrel/issues
-Depends: pedtools (>= 2.6.0), R (>= 4.1.0)
-Imports: glue, pbapply, pedprobr (>= 0.8), ribd (>= 1.7.1), verbalisr
+Depends: pedtools (>= 2.8.1), R (>= 4.2.0)
+Imports: glue, pbapply, pedprobr (>= 1.0.0), ribd (>= 1.7.1), verbalisr
         (>= 0.7.1)
 Suggests: ggplot2, ggrepel, ibdsim2, plotly, poibin, scales, testthat
 Encoding: UTF-8
@@ -30,10 +30,10 @@ Language: en-GB
 LazyData: true
 RoxygenNote: 7.3.2
 NeedsCompilation: no
-Packaged: 2025-02-11 14:31:29 UTC; magnu
-Author: Magnus Dehli Vigeland [aut, cre]
-    (<https://orcid.org/0000-0002-9134-4962>),
+Packaged: 2025-05-07 10:38:03 UTC; magnu
+Author: Magnus Dehli Vigeland [aut, cre] (ORCID:
+    <https://orcid.org/0000-0002-9134-4962>),
   Thore Egeland [ctb]
 Maintainer: Magnus Dehli Vigeland <m.d.vigeland@medisin.uio.no>
 Repository: CRAN
-Date/Publication: 2025-02-11 16:20:02 UTC
+Date/Publication: 2025-05-07 11:10:02 UTC

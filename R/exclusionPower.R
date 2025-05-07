@@ -85,8 +85,7 @@
 #'
 #' @references T. Egeland, N. Pinto and M.D. Vigeland, *A general approach to
 #'   power calculation for relationship testing.* Forensic Science
-#'   International: Genetics 9 (2014): 186-190.
-#'   \doi{10.1016/j.fsigen.2013.05.001}
+#'   International: Genetics 9 (2014). \doi{10.1016/j.fsigen.2013.05.001}
 #'
 #' @examples
 #'
@@ -441,7 +440,7 @@ print.EPresult = function(x, ...) {
       return(NULL)
 
     omd = oneMarkerDistribution(claim[[i]], ids = ids[compsClaim == i],
-                                partialmarker = 1, verbose = FALSE)
+                                marker = 1, verbose = FALSE)
     omd == 0
     })
 
@@ -494,7 +493,7 @@ print.EPresult = function(x, ...) {
     ids.i = ids[compsTrue == i]
     grid.i = unique.matrix(incomp.grid[, ids.i, drop = FALSE])
 
-    omd = oneMarkerDistribution(true[[i]], ids.i, partialmarker = 1,
+    omd = oneMarkerDistribution(true[[i]], ids.i, marker = 1,
                           grid.subset = grid.i, verbose = FALSE)
     omd
   })
