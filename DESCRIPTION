@@ -1,7 +1,7 @@
 Type: Package
 Package: forrel
 Title: Forensic Pedigree Analysis and Relatedness Inference
-Version: 1.8.0
+Version: 1.8.1
 Authors@R: c(
     person("Magnus Dehli", "Vigeland", , "m.d.vigeland@medisin.uio.no", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-9134-4962")),
@@ -30,10 +30,10 @@ Language: en-GB
 LazyData: true
 RoxygenNote: 7.3.2
 NeedsCompilation: no
-Packaged: 2025-05-07 10:38:03 UTC; magnu
+Packaged: 2025-07-21 19:34:03 UTC; magnu
 Author: Magnus Dehli Vigeland [aut, cre] (ORCID:
     <https://orcid.org/0000-0002-9134-4962>),
   Thore Egeland [ctb]
 Maintainer: Magnus Dehli Vigeland <m.d.vigeland@medisin.uio.no>
 Repository: CRAN
-Date/Publication: 2025-05-07 11:10:02 UTC
+Date/Publication: 2025-07-21 20:00:12 UTC

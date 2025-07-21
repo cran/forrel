@@ -1,6 +1,10 @@
 #' Norwegian STR frequencies
 #'
-#' A database of Norwegian allele frequencies for 35 STR markers.
+#' A database of Norwegian allele frequencies for 35 STR markers. NOTE: An
+#' updated database of these and other markers, are available in the `norSTR`
+#' package. The `NorwegianFrequencies` object is kept here for backward
+#' compatibility.
+#'
 #'
 #' @format A list of length 35. Each entry is a numerical vector summing to 1,
 #'   named with allele labels.
@@ -8,73 +12,39 @@
 #'   The following markers are included:
 #'
 #'   * `D3S1358`: 12 alleles
-#'
 #'   * `TH01`: 10 alleles
-#'
 #'   * `D21S11`: 26 alleles
-#'
 #'   * `D18S51 `: 23 alleles
-#'
 #'   * `PENTA_E`: 21 alleles
-#'
 #'   * `D5S818`: 9 alleles
-#'
 #'   * `D13S317`: 9 alleles
-#'
 #'   * `D7S820`: 19 alleles
-#'
 #'   * `D16S539`: 9 alleles
-#'
 #'   * `CSF1PO`: 11 alleles
-#'
 #'   * `PENTA_D`: 24 alleles
-#'
 #'   * `VWA`: 12 alleles
-#'
 #'   * `D8S1179`: 12 alleles
-#'
 #'   * `TPOX`: 9 alleles
-#'
 #'   * `FGA`: 25 alleles
-#'
 #'   * `D19S433`: 17 alleles
-#'
 #'   * `D2S1338`: 13 alleles
-#'
 #'   * `D10S1248`: 9 alleles
-#'
 #'   * `D1S1656`: 17 alleles
-#'
 #'   * `D22S1045`: 9 alleles
-#'
 #'   * `D2S441`: 13 alleles
-#'
 #'   * `D12S391`: 23 alleles
-#'
 #'   * `SE33`: 55 alleles
-#'
 #'   * `D7S1517`: 11 alleles
-#'
 #'   * `D3S1744`: 8 alleles
-#'
 #'   * `D2S1360`: 10 alleles
-#'
 #'   * `D6S474`: 6 alleles
-#'
 #'   * `D4S2366`: 7 alleles
-#'
 #'   * `D8S1132`: 12 alleles
-#'
 #'   * `D5S2500`: 8 alleles
-#'
 #'   * `D21S2055`: 18 alleles
-#'
 #'   * `D10S2325`: 10 alleles
-#'
 #'   * `D17S906`: 78 alleles
-#'
 #'   * `APOAI1`: 41 alleles
-#'
 #'   * `D11S554`: 51 alleles
 #'
 #' @source Dupuy et al. (2013): *Frequency data for 35 autosomal STR markers in
@@ -85,31 +55,38 @@
 "NorwegianFrequencies"
 
 
-#' FORCE panel kinship SNPs
+#' FORCE panel SNP data
 #'
-#' A data frame describing (a subset of) the FORCE panel of SNPs designed for
-#' applications in forensic genetics (Tillmar et al., 2021). The subset included
-#' here are the SNPs recommended for kinship analysis. As the original
-#' publication did not include allele frequencies, these were downloaded from
-#' Ensembl via the biomaRt package. 15 markers were removed as frequency
-#' information could not be retrieved.
+#' Data frames describing the FORCE panel of SNPs for forensic genetics (Tillmar
+#' et al., 2021). We provide here two subsets of the complete panel: the
+#' autosomal kinship SNPs (`FORCE`, n = 3930) and the X-chromosomal SNPs
+#' (`XFORCE`, n = 246). To attach the markers to a pedigree, use
+#' [pedtools::setSNPs()] (see Examples).
 #'
-#' To attach the FORCE markers to a pedigree, use [pedtools::setSNPs()] (see
-#' Examples).
+#' Allele frequencies were retrieved from Ensembl using the REST API, with the
+#' population `1000GENOMES:phase_3:ALL` as primary source. For 9 SNPs where this
+#' was unavailable, `gnomADg:ALL` was used instead.
 #'
+#' One SNP - rs2323964 - was excluded due to lack of Ensembl/dbSNP support.
 #'
-#' @format A data frame with 3915 rows and 6 columns:
+#' For details, the code used to download and process the data is available in
+#' the `data-raw` folder on GitHub:
+#' https://github.com/magnusdv/forrel/tree/master/data-raw
 #'
-#'   * `CHROM`: Chromosome (1-22)
+#' _Note_: The autosomal dataset (`FORCE`) was updated in version 1.8.1, adding 15
+#' markers that were previously missing and revising some frequencies. The
+#' previous version is available via:
+#' ```
+#' pth = system.file("extdata/FORCE_old.txt", package = "forrel")
+#' oldforce = read.table(pth, header = TRUE)
+#' ```
 #'
+#' @format Both `FORCE` and `XFORCE` are data frames with the following columns:
+#'   * `CHROM`: Chromosome
 #'   * `MARKER`: Marker name (rs number)
-#'
-#'   * `MB`: Physical position in megabases (build GRCh38)
-#'
+#'   * `MB`: Physical position in megabases (GRCh38)
 #'   * `A1`: First allele
-#'
 #'   * `A2`: Second allele
-#'
 #'   * `FREQ1`: Allele frequency of `A1`
 #'
 #' @source Tillmar et al. The FORCE Panel: An All-in-One SNP Marker Set for
@@ -120,7 +97,12 @@
 #' x = setSNPs(nuclearPed(), snpData = FORCE)
 #' summary(x)
 #'
-#' getMap(x, markers = 1:5)
-#' getFreqDatabase(x, markers = 1:5)
+#' getMap(x, markers = 1:3)
+#' getFreqDatabase(x, markers = 1:3)
 #'
 "FORCE"
+
+
+#' @rdname FORCE
+#' @format NULL
+"XFORCE"
