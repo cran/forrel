@@ -26,7 +26,7 @@
 #' @param ids A vector of ID labels; the individuals to include in the check.
 #'   Default: All typed members of `x`.
 #' @param includeInbred A logical, by default FALSE, indicating if inbred
-#'   individuals should be excluded from the analysis.
+#'   individuals should be included in the analysis.
 #' @param acrossComps A logical indicating if pairs of individuals in different
 #'   components should be considered. Default: TRUE.
 #' @param plotType Either "base" (default), "ggplot2", "plotly" or "none".
@@ -123,7 +123,7 @@ checkPairwise = function(x, ids = typedMembers(x), includeInbred = FALSE, across
   }
 
   # If pedlist, allow duplicated names among non-included indivs
-  if(is.pedList(x) && anyDuplicated(labs <- labels(x, unlist = TRUE))) {
+  if(is.pedList(x) && anyDuplicated.default(labs <- labels(x, unlist = TRUE))) {
     dups = unique.default(labs[duplicated.default(labs)])
     if(any(dups %in% includeIds))
       stop2("Duplicated ID label: ", intersect(dups, includeIds))
@@ -141,6 +141,11 @@ checkPairwise = function(x, ids = typedMembers(x), includeInbred = FALSE, across
     if(length(inbr) && verbose)
       message("Excluding inbred individuals: ", toString(inbr))
     includeIds = setdiff(includeIds, inbr)
+
+    if(length(includeIds) < 2) {
+      if(verbose) message("No relationships to check: Less than 2 typed individuals included")
+      return(invisible())
+    }
   }
 
   # Estimated coefficients
@@ -206,7 +211,7 @@ checkPairwise = function(x, ids = typedMembers(x), includeInbred = FALSE, across
       # If ecdf not already computed: simulate
       if(!ks %in% names(ecdfList)) {
         if(verbose)
-          cat("Simulating null distribution for GLR at kappa =", sub(ks," ","-"), "\n")
+          cat("Simulating null distribution for GLR at kappa =", sub(" ", "-", ks, fixed = TRUE), "\n")
         kap = c(kappa0[i], kappa1[i], kappa2[i])
         ecdfList[[ks]] = ecdfGLR(kap, nsim = nsim, freqList = db, log = TRUE, seed = seed)
       }
@@ -222,7 +227,7 @@ checkPairwise = function(x, ids = typedMembers(x), includeInbred = FALSE, across
     errtxt = sprintf("pval < %g", pvalThreshold)
   }
   else {
-    cpRes$err = err = !is.na(cpRes$GLR) & cpRes$GLR >= GLRthreshold
+    cpRes$err = err = !is.na(logGLR) & logGLR >= log(GLRthreshold)
     errtxt = sprintf("GLR > %g", GLRthreshold)
   }
 
@@ -249,13 +254,15 @@ plotCP = function(cpRes = NULL, plotType = c("base", "ggplot2", "plotly"),
   }
 
   err = cpRes$err
+  hasErr = isTRUE(any(err, na.rm = TRUE))
+
   relgroup = cpRes$relgroup
   k0 = cpRes$k0
   k2 = cpRes$k2
 
   errDat = NULL
-  if(any(err)) {
-    errDat = cpRes[err, , drop = FALSE]
+  if(hasErr) {
+    errDat = cpRes[err %in% TRUE, , drop = FALSE]
     errDat$labs = labs = paste(errDat$id1, "-", errDat$id2)
   }
 
@@ -274,7 +281,7 @@ plotCP = function(cpRes = NULL, plotType = c("base", "ggplot2", "plotly"),
     legpch = ALLSHAPES[levels(relgroup)]
     legcex = rep(1, length(legcol))
 
-    if(any(err, na.rm = T)) {
+    if(hasErr) {
       legtxt = c(legtxt, NA, errtxt)
       legcol = c(legcol, NA, 1)
       legpch = c(legpch, NA, 1)
@@ -283,7 +290,8 @@ plotCP = function(cpRes = NULL, plotType = c("base", "ggplot2", "plotly"),
 
     ribd::showInTriangle(cpRes[1:6], plotType = "base", col = cols, pch = pchs,
                          labels = labels, ...)
-    points(errDat$k0, errDat$k2, pch = 1, lwd = 1.8, cex = 3)
+    if(hasErr)
+      points(errDat$k0, errDat$k2, pch = 1, lwd = 1.8, cex = 3)
 
     legend("topright", title = " According to pedigree", title.adj = 0,
            bg = "whitesmoke", legend = legtxt, col = legcol, pch = legpch,
@@ -311,7 +319,7 @@ plotCP = function(cpRes = NULL, plotType = c("base", "ggplot2", "plotly"),
                      legend.title = ggplot2::element_text(size = 12)
                      )
 
-    if(isTRUE(labels) || !is.null(errDat)) {
+    if(isTRUE(labels) || hasErr) {
       if(!requireNamespace("ggrepel", quietly = TRUE))
         stop2("Package `ggrepel` must be installed for this option to work")
     }
@@ -325,7 +333,7 @@ plotCP = function(cpRes = NULL, plotType = c("base", "ggplot2", "plotly"),
         size = 4, max.overlaps = Inf, box.padding = 1, show.legend = FALSE)
     }
 
-    if(!is.null(errDat)) {
+    if(hasErr) {
       p = p +
         ggplot2::geom_point(data = errDat, ggplot2::aes(k0, k2, size = "big"),
                           shape = 1, stroke = 1, col = 1) +
@@ -360,7 +368,7 @@ plotCP = function(cpRes = NULL, plotType = c("base", "ggplot2", "plotly"),
 
     if(is.numeric(ALLSHAPES)) {
       idx = match(ALLSHAPES, names(plotlySymb), nomatch = 0)
-      ALLSHAPES[idx] = plotlySymb[idx]
+      ALLSHAPES[idx > 0] = unname(plotlySymb[idx[idx > 0]])
     }
 
     p = ribd::ibdTriangle(plotType = "plotly", ...)
@@ -369,25 +377,28 @@ plotCP = function(cpRes = NULL, plotType = c("base", "ggplot2", "plotly"),
       datr = dat[dat$relgroup == r, , drop = FALSE]
       p = p |>
         plotly::add_markers(data = datr, x = ~k0, y = ~k2, customdata = ~idx,
-                            symbol = I(ALLSHAPES[r]), color = I(ALLCOLS[r]),
-                            cliponaxis = FALSE,
-                            marker = list(size = 12,
+                            color = I(ALLCOLS[r]), cliponaxis = FALSE,
+                            marker = list(symbol = unname(ALLSHAPES[r]), size = 12,
                                           line = list(width = if(r == "Other") 1 else 2)),
-                            text= ~labs, hoverinfo = "text", name = r, legendrank = 2)
+                            text = ~labs, hoverinfo = "text", name = r, legendrank = 2)
     }
-    if(any(dat$err)) {
+
+    if(hasErr) {
 
       # Invisible spacer trace
-      p = p |> plotly::add_markers(x = 0, y = 0, name = " ", hoverinfo = "none",
-                             marker = list(size = 0, color = 'rgba(0,0,0,0)'),
-                             showlegend = TRUE, legendrank = 1.5)
+      p = p |>
+        plotly::add_markers(x = 0, y = 0, name = " ", hoverinfo = "none",
+                            marker = list(size = 0, color = 'rgba(0,0,0,0)'),
+                            showlegend = TRUE, legendrank = 1.5)
 
       # Error circles
-      p = p |> plotly::add_markers(data = errDat, x = ~k0, y = ~k2,
-                                   name = errtxt, cliponaxis = FALSE,
-                                   symbol = I("circle-open"), color = I("black"),
-                                   marker = list(size = 22, line = list(width = 1)),
-                                   hoverinfo = "none", legendrank = 1)
+      p = p |>
+        plotly::add_markers(data = errDat, x = ~k0, y = ~k2,
+                            name = errtxt, cliponaxis = FALSE,
+                            color = I("black"),
+                            marker = list(symbol = "circle-open", size = 22,
+                                          line = list(width = 1)),
+                            hoverinfo = "none", legendrank = 1)
     }
 
     p = p |> plotly::layout(

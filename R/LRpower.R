@@ -39,10 +39,8 @@
 #'   of `threshold`, the fraction of simulations resulting in a LR exceeding the
 #'   given number.
 #'
-#'   * `time`: The total computation time.
-#'
-#'   * `params`: A list containing the input parameters `missing`, `markers`,
-#'   `nsim`, `threshold` and `disableMutations`
+#'   * `params`: A list containing the input parameters `markers`, `nsim`,
+#'   `threshold` and `disableMutations`
 #'
 #' @examples
 #'
@@ -118,7 +116,7 @@ LRpower = function(numeratorPed, denominatorPed, truePed = numeratorPed, ids, ma
       alleles = seq_len(alleles)
 
     # Create and attach locus to both pedigrees
-    locus = list(alleles = alleles, afreq = afreq, chrom = if (Xchrom) 23 else NA)
+    locus = list(alleles = alleles, afreq = afreq, chrom = if(Xchrom) 23 else NA)
     truePed = setMarkers(truePed, alleleMatrix = am, locusAttributes = locus)
 
     markers = 1
@@ -143,12 +141,13 @@ LRpower = function(numeratorPed, denominatorPed, truePed = numeratorPed, ids, ma
         markers = 1:nmTot
     }
 
-    # Check for already typed members. TODO: Support for partially typed members
+    # Check for already typed members.
+    # TODO (minor): Support for partially typed members
     typed = typedMembers(sourcePed)
     if(length(bad <- intersect(allids, typed)))
       stop2("Individual is already genotyped: ", toString(bad))
 
-    # Select markers from source and transfer to truePed (if neccessary)
+    # Select markers from source and transfer to truePed (if necessary)
     truePed = switch(source,
        true = selectMarkers(truePed, markers),
        numerator = transferMarkers(from = selectMarkers(numeratorPed, markers),
@@ -158,7 +157,7 @@ LRpower = function(numeratorPed, denominatorPed, truePed = numeratorPed, ids, ma
   }
 
   # Plot
-  if (isTRUE(plot) || plot == "plotOnly") {
+  if(isTRUE(plot) || plot == "plotOnly") {
     tp = selectMarkers(truePed, NULL)
     if(identical(tp, selectMarkers(numeratorPed, NULL))) {
       peds = list(numeratorPed, denominatorPed)
@@ -178,12 +177,16 @@ LRpower = function(numeratorPed, denominatorPed, truePed = numeratorPed, ids, ma
                 fill = list(green = allids),
                 marker = match(plotMarkers, markers))
 
-    if (plot == "plotOnly")
+    if(plot == "plotOnly")
       return()
   }
 
   # Set seed once
-  set.seed(seed)
+  if(!is.null(seed)) {
+    if(.miraiWorkers() > 0L)
+      stop2("`seed` is incompatible with mirai workers; set with `mirai::daemons(n, seed = ...)`")
+    set.seed(seed)
+  }
 
   # Simulate nsim complete profiles from truePed
   if(verbose)

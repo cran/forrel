@@ -187,7 +187,7 @@ exclusionPower = function(claimPed, truePed, ids, markers = NULL, source = "clai
       alleles = seq_len(alleles)
 
     # Create and attach locus to both pedigrees
-    locus = list(alleles = alleles, afreq = afreq, chrom = if (Xchrom) 23 else NA)
+    locus = list(alleles = alleles, afreq = afreq, chrom = if(Xchrom) 23 else NA)
     claimPed = setMarkers(claimPed, alleleMatrix = am, locusAttributes = locus)
     truePed = setMarkers(truePed, alleleMatrix = am, locusAttributes = locus)
 
@@ -231,7 +231,7 @@ exclusionPower = function(claimPed, truePed, ids, markers = NULL, source = "clai
   }
 
   # Plot
-  if (isTRUE(plot) || plot == "plotOnly") {
+  if(isTRUE(plot) || plot == "plotOnly") {
     plotPedList(list(claimPed, truePed),
                 newdev = TRUE,
                 titles = c("Claim", "True"),
@@ -239,7 +239,7 @@ exclusionPower = function(claimPed, truePed, ids, markers = NULL, source = "clai
                 col = list(red = allids),
                 marker = match(plotMarkers, markers))
 
-    if (plot == "plotOnly")
+    if(plot == "plotOnly")
       return()
   }
 
@@ -255,12 +255,9 @@ exclusionPower = function(claimPed, truePed, ids, markers = NULL, source = "clai
     if(isTRUE(disableMutations))
       disableMutations = which(hasMut)
     else if(identical(disableMutations, NA)) {
-      # Disable mutations for markers consistent in both true and claim
-      cons = consistentMarkers(claimPed, hasMut) & consistentMarkers(truePed, hasMut)
-
-      disableTF = logical(nMark)
-      disableTF[hasMut] = cons
-      disableMutations = which(disableTF)
+      # Disable if consistent in both true and claim
+      cons = consistentMarkers(truePed, hasMut) & consistentMarkers(claimPed, hasMut)
+      disableMutations = which(hasMut)[cons]
     }
     else {# if numeric or character: Use original pedigree, i.e. before selection
       midx_orig = whichMarkers(sourcePed, markers)
@@ -275,9 +272,13 @@ exclusionPower = function(claimPed, truePed, ids, markers = NULL, source = "clai
     }
   }
 
-  ### Baseline likelihoods
-  trueBase = likelihood(truePed, markers = seq_len(nMark))
-  claimBase = likelihood(claimPed, markers = seq_len(nMark))
+  ### Baseline consistency (possibly after mutation disabling)
+  trueCons = consistentMarkers(truePed, removeMut = FALSE)
+  claimCons = consistentMarkers(claimPed, removeMut = FALSE)
+
+  # Set seed once
+  if(!is.null(seed))
+    set.seed(seed)
 
   ### Compute the exclusion power of each marker.
   # The result is rectangular, with nMark columns and NI rows
@@ -294,14 +295,14 @@ exclusionPower = function(claimPed, truePed, ids, markers = NULL, source = "clai
     }
 
     # If impossible in true, return NA
-    if(trueBase[i] == 0) {
+    if(!trueCons[i]) {
       if(verbose)
         message("*** INCOMPATIBLE WITH TRUE PEDIGREE ***\nEP = NA")
       return(rep(NA_real_, NI))
     }
 
     # If impossible in claim, return 1
-    if(claimBase[i] == 0) {
+    if(!claimCons[i]) {
       if(verbose)
         message("*** INCOMPATIBLE WITH CLAIMED PEDIGREE ***\nEP = 1")
       return(rep(1, NI))
@@ -314,13 +315,12 @@ exclusionPower = function(claimPed, truePed, ids, markers = NULL, source = "clai
       }))
     }
     else {
-      trueSims = markerSim(truePed, ids = allids, N = nsim, partialmarker = i,
-                           seed = seed, verbose = FALSE)
+      trueSims = markerSim(truePed, ids = allids, N = nsim, partialmarker = i, verbose = FALSE)
 
       this.ep = unlist(lapply(ids, function(idvec) {
         claimSims = transferMarkers(trueSims, claimPed, ids = c(typed, idvec))
-        liks = likelihood(claimSims, markers = 1:nsim)
-        mean(liks == 0)
+        isInc = inconsistentMarkers(claimSims, names = FALSE, removeMut = FALSE)
+        mean(isInc)
       }))
     }
 
@@ -370,7 +370,7 @@ summariseEP = function(epvec) {
     distrib = c(`0` = 1)
   else {
     distrib = setNames(rep(NA_real_, n.nonz + 1), 0:n.nonz)
-    if (requireNamespace("poibin", quietly = TRUE))
+    if(requireNamespace("poibin", quietly = TRUE))
       distrib[] = poibin::dpoibin(kk = 0:n.nonz, pp = epvec[!is.na(epvec) & epvec > 0])
     else
       warning("Package `poibin` not found. Cannot compute the distribution of exclusion counts without this; returning NA's")
@@ -404,18 +404,18 @@ print.EPresult = function(x, ...) {
 
 }
 
-  ###############################
-  ### Computations start here ###
-  ###############################
+###############################
+### Computations start here ###
+###############################
 
 .EPsingleMarker = function(claimPed, truePed, ids, marker, verbose = TRUE) {
 
   # Step 1: Genotype combinations incompatible with "claim"
   # Step 2: Probability of incomp under `true` pedigree
 
-  if (is.ped(claimPed))
+  if(is.ped(claimPed))
     claimPed = list(claimPed)
-  if (is.ped(truePed))
+  if(is.ped(truePed))
     truePed = list(truePed)
 
   claim = selectMarkers(claimPed, marker)
@@ -436,13 +436,13 @@ print.EPresult = function(x, ...) {
   ### Step 1
   # Incompatible combinations in each component
   I.g.list = lapply(seq_along(claim), function(i) {
-    if(!any(compsClaim == i))
+    ids.i = ids[compsClaim == i]
+    if(!length(ids.i))
       return(NULL)
 
-    omd = oneMarkerDistribution(claim[[i]], ids = ids[compsClaim == i],
-                                marker = 1, verbose = FALSE)
+    omd = oneMarkerDistribution(claim[[i]], ids = ids.i, marker = 1, verbose = FALSE)
     omd == 0
-    })
+  })
 
   # Remove NULLs
   I.g.list = I.g.list[lengths(I.g.list) > 0]
@@ -454,6 +454,15 @@ print.EPresult = function(x, ...) {
   # If no incompatibilities, return 0
   if(!any(I.g))
     return(0)
+
+  # Reorder claim array axes to original `ids` order
+  idsClaim = unlist(lapply(seq_along(claim), \(i) ids[compsClaim == i]), use.names = FALSE)
+  names(dimnames(I.g)) = idsClaim
+
+  if(!identical(idsClaim, ids)) {
+    I.g = aperm(I.g, match(ids, idsClaim))
+    names(dimnames(I.g)) = ids
+  }
 
   # Extract the TRUE positions (= incompatible combinations)
   incomp = which(I.g, arr.ind = TRUE, useNames = FALSE)
@@ -470,8 +479,8 @@ print.EPresult = function(x, ...) {
 
   ### Step 2: Probability of incomp under `true` pedigree
 
-  # Grid to be used as input to oneMarkerDistribution
-  # Recall: Entries now refers to rows in allGenotypes(n)
+  # Grid to be used as input to oneMarkerDistribution()
+  # Entries refer to rows in allGenotypes(n)
   incomp.grid = incomp
 
   # If X: Modify male columns.  TODO: would be nice to clean this up a bit.
@@ -503,6 +512,13 @@ print.EPresult = function(x, ...) {
 
   # Reduce to array
   p.g = Reduce("%o%", p.g.list)
+
+  # Ensure correct axis order
+  idsTrue = unlist(lapply(seq_along(true), \(i) ids[compsTrue == i]), use.names = FALSE)
+  names(dimnames(p.g)) = idsTrue
+
+  if(!identical(idsTrue, ids))
+    p.g = aperm(p.g, match(ids, idsTrue))
 
   # The entries corresponding to exclusions
   excl = p.g[I.g]

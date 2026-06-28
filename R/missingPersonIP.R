@@ -28,8 +28,6 @@
 #'   of `threshold`, the fraction of simulations resulting in a LR exceeding the
 #'   given number.
 #'
-#'   * `time`: The total computation time.
-#'
 #'   * `params`: A list containing the input parameters `missing`, `markers`,
 #'   `nsim`, `threshold` and `disableMutations`
 #'
@@ -69,7 +67,7 @@ missingPersonIP = function(reference, missing, markers, nsim = 1, threshold = NU
       markers = 1:nmark
   }
 
-  # Do any of the markers model mutatinos?
+  # Do any of the markers model mutations?
   hasMut = allowsMutations(reference, markers)
 
   # For which marker should mutations be disabled?
@@ -79,12 +77,8 @@ missingPersonIP = function(reference, missing, markers, nsim = 1, threshold = NU
 
   if(disALL)
     disable = markers[hasMut]
-  else if(disGOOD) { # disable only if consistent
-    refNoMut = reference
-    mutmod(refNoMut, markers[hasMut]) = NULL
-    liksNoMut = likelihood(refNoMut, markers = markers[hasMut])
-    disable = markers[hasMut][liksNoMut > 0]
-  }
+  else if(disGOOD) # disable only if consistent
+    disable = consistentMarkers(reference, hasMut, names = TRUE)
   else if(disSELECT)
     disable = whichMarkers(reference, disableMutations)
   else
@@ -104,13 +98,17 @@ missingPersonIP = function(reference, missing, markers, nsim = 1, threshold = NU
   unrelatedPed = list(reference, singleton(poiLabel, sex = getSex(reference, missing)))
 
   # Raise error if impossible markers
-  liks = likelihood(reference, markers = midx)
-  if(any(liks == 0))
-    stop2("Marker incompatible with reference pedigree: ", markers[liks == 0],
+  imp = inconsistentMarkers(reference, markers = midx, names = TRUE, removeMut = FALSE)
+  if(length(imp))
+    stop2("Marker incompatible with reference pedigree: ", imp,
           "\nThis makes conditional simulations impossible. Exclude the marker from the computation or add a mutation model")
 
   # Set seed once
-  set.seed(seed)
+  if(!is.null(seed)) {
+    if(.miraiWorkers() > 0L)
+      stop2("`seed` is incompatible with mirai workers; set with `mirai::daemons(n, seed = ...)`")
+    set.seed(seed)
+  }
 
   # Simulate nsim complete profiles of relatedPed
   if(verbose)
@@ -157,8 +155,8 @@ missingPersonIP = function(reference, missing, markers, nsim = 1, threshold = NU
                 disableMutations = disableMutations)
 
   structure(list(LRperSim = LRperSim, meanLRperMarker = meanLRperMarker,
-                 meanLR = meanLR, meanLogLR = meanLogLR, IP = IP,
-                 time = time, params = params), class = "LRpowerResult")
+                 meanLR = meanLR, meanLogLR = meanLogLR, IP = IP, params = params),
+            class = c("mpIP", "LRpowerResult"))
 }
 
 

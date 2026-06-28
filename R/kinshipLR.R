@@ -222,7 +222,7 @@ kinshipLR = function(..., ref = NULL, source = NULL, markers = NULL, likArgs = N
     unnamed = hypnames == "" | is.na(hypnames)
     hypnames[unnamed] = paste0("H", which(unnamed))
   }
-  if(dup <- anyDuplicated(hypnames))
+  if(dup <- anyDuplicated.default(hypnames))
     stop2("Duplicated hypothesis name: ", hypnames[dup])
 
   names(x) = hypnames
@@ -296,34 +296,27 @@ kinshipLR = function(..., ref = NULL, source = NULL, markers = NULL, likArgs = N
 
   # Unlinked markers: pedprobr ----------------------------------------------
 
-  # Break all loops (NB: rapply() doesn't work here, since is.list(ped) = TRUE)
-  breaklp = function(a) {
-    if(is.pedList(a))
-      return(lapply(a, breaklp))
-    if(is.singleton(a))
-      return(a)
-    breakLoops(a, verbose = FALSE)
-  }
+  likArgs = likArgs %||% list()
+  prohib = .myintersect(names(likArgs), c("x", "markers", "marker", "logbase", "peelOrder"))
 
-  x_loopfree = lapply(x, breaklp)
+  if(length(prohib))
+    stop2("Cannot pass argument in `likArgs`: ", prohib)
 
-  # compute likelihoods
-  if(is.null(likArgs))
-    likFun = function(xx) likelihood(xx, markers = markers)
-  else
-    likFun = function(xx) do.call(likelihood, c(list(xx, markers = markers), likArgs))
 
-  liks = lapply(x, likFun)
-  likelihoodsPerMarker = do.call(cbind, liks)
+  lnLik = lapply(x, \(xx) do.call(likelihood,
+    c(list(x = xx, markers = markers, logbase = exp(1)), likArgs)))
 
-  # LR per marker and total
-  LRperMarker = do.call(cbind, lapply(1:length(x), function(j) liks[[j]]/liks[[refIdx]]))
+  lnLikPerMarker = do.call(cbind, lnLik)
+  colnames(lnLikPerMarker) = hypnames
 
-  # Create names for LR comparisons
-  colnames(LRperMarker) = paste0(hypnames, ":", hypnames[refIdx])
+  lnLRperMarker = sweep(lnLikPerMarker, 1, lnLikPerMarker[, refIdx], "-")
+  lnLRtotal = colSums(lnLRperMarker)
 
-  # Total LR
-  LRtotal = apply(LRperMarker, 2, prod)
+  LRperMarker = exp(lnLRperMarker)
+  LRtotal = exp(lnLRtotal)
+  likelihoodsPerMarker = exp(lnLikPerMarker)
+
+  names(LRtotal) = colnames(LRperMarker) = paste0(hypnames, ":", hypnames[refIdx])
 
   # Use marker names in output
   markernames = name(x[[1]], markers)
@@ -356,9 +349,14 @@ print.LRresult = function(x, ...) {
   # Split marker map by chromosome (keep original chrom order)
   chromSplit = split(physMap, factor(physMap$CHROM, levels = unique(physMap$CHROM)))
 
+  # Use sex-averaging unless X-chrom
+  isX = names(chromSplit) %in% c("X", "23")
+  usesex = ifelse(isX, "female", "average")
+
   # Convert positions in each chrom
-  newmap = lapply(chromSplit, function(chrmap) {
-    CM = ibdsim2::convertPos(chrmap$CHROM, Mb = chrmap$MB, map = genMap, sex = "average")
+  newmap = lapply(seq_along(chromSplit), function(i) {
+    chrmap = chromSplit[[i]]
+    CM = ibdsim2::convertPos(chrmap$CHROM, Mb = chrmap$MB, map = genMap, sex = usesex[i])
     cbind(chrmap, CM = CM)[c("CHROM", "MARKER", "CM", "MB")] # 3 first cols as used by MERLIN
   })
 

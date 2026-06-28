@@ -15,6 +15,7 @@ isNumber = function(x, minimum = NA, maximum = NA) {
 # Faster alternative to suppressWarnings(as.numeric(v))
 # NB: doesn't catch scientific notation 1e-4.
 asNum = function(v) {
+  if(is.numeric(v)) return(v)
   num = grep("[^-0-9.]", v, invert = TRUE)
   u = rep(NA_real_, length(v))
   u[num] = as.numeric(v[num])
@@ -24,8 +25,9 @@ asNum = function(v) {
 # Faster alternative to suppressWarnings(as.integer(v))
 # NB: doesn't catch scientific notation 1e+12.
 asInt = function(v) {
+  if(is.numeric(v)) return(as.integer(v))
   num = grep("[^-0-9]", v, invert = TRUE)
-  u = rep(NA_real_, length(v))
+  u = rep(NA_integer_, length(v))
   u[num] = as.integer(v[num])
   u
 }
@@ -37,6 +39,9 @@ rst = function(v, digits = 3)
 `%||%` = function(x, y) {
   if(is.null(x)) y else x
 }
+
+`%notin%` = function(x, table)
+  match(x, table, nomatch = 0L) == 0L
 
 pluralise = function(noun = "", n) {
   if(missing(n)) return(pluralise("", noun))
@@ -52,6 +57,10 @@ pluralise = function(noun = "", n) {
   y[match(x, y, 0L)]
 }
 
+.mysetequal = function(x, y) {
+  !anyNA(match(x, y)) && !anyNA(match(y, x))
+}
+
 #random 0/1 vector of length n.
 .rand01 = function(n) {
   sample.int(2, size = n, replace = TRUE) - 1L
@@ -62,6 +71,11 @@ pluralise = function(noun = "", n) {
   x
 }
 
+.miraiWorkers = function() {
+  if(!mirai::daemons_set())
+    return(0L)
+  mirai::info()[["connections"]] %||% 0L
+}
 
 ftime = function(st, digits = 3)
   format(Sys.time() - st, digits = digits)
@@ -73,7 +87,7 @@ ftime = function(st, digits = 3)
     v = n
     n = length(v)
   }
-  if (n < 2)
+  if(n < 2)
     return(matrix(nrow = 0, ncol = 2))
 
   x = rep.int(seq_len(n - 1), (n - 1):1)
@@ -93,23 +107,6 @@ isIP = function(x) {
   inherits(x, "LRpowerResult") || inherits(x, "mpIP")
 }
 
-# Test if genotypes are consistent with ped
-# (A better, but slower, alternative to `mendelianCheck()`)
-consistentMarkers = function(x, markers = seq_len(nMarkers(x))) {
-
-  # `marker` may be numeric, character or logical
-  y = selectMarkers(x, markers)
-  nMark = nMarkers(y)
-
-  if(!nMark)
-    return(TRUE)
-
-  mutmod(y, 1:nMark) = NULL
-  liks = likelihood(y, markers = 1:nMark)
-
-  # Return TRUE if likelihood is nonzero
-  liks > 0
-}
 
 # Disable mutations
 disableMutationModels = function(x, disable, verbose = FALSE) {
@@ -162,10 +159,8 @@ fixAllelesAndFreqs = function(alleles = NULL, afreq = NULL,
   names(afreq) = names(afreq) %||% als
 
   # Sort alleles and frequencies (numerical sorting if appropriate)
-  if (!is.numeric(als) && !anyNA(suppressWarnings(as.numeric(als))))
-    ord = order(as.numeric(als))
-  else
-    ord = order(als)
+  numAls = asNum(als)
+  ord = if(!anyNA(numAls)) ord = order(numAls) else order(als)
 
   # Return ordered, named frequencies
   afreq[ord]

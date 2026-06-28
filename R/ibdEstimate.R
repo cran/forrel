@@ -136,8 +136,8 @@ ibdEstimate = function(x, ids = typedMembers(x), param = c("kappa", "delta"),
   pairs = lapply(seq_len(nrow(ids)), function(i) ids[i, ])
 
   allids = unique.default(unlist(pairs))
-  if(!all(allids %in% typedMembers(x)))
-    stop2("Untyped pedigree member: ", setdiff(allids, typedMembers(x)))
+  if(anyNA(match(allids, typedMembers(x))))
+    stop2("Untyped pedigree member: ", .mysetdiff(allids, typedMembers(x)))
 
   # Alleles and frequencies
   alleleData = .prepAlleleData(x, ids = allids)
@@ -169,14 +169,15 @@ ibdEstimate = function(x, ids = typedMembers(x), param = c("kappa", "delta"),
   ids = do.call(rbind, lapply(resList, function(r) r$ids))
   N = unlist(lapply(resList, function(r) r$nMarkers))
 
-  res = structure(data.frame(ids, N, coefs),
-                  names = c("id1", "id2", "N", if(param == "kappa") paste0("k", 0:2) else paste0("d", 1:9)),
-                  class = c("ibdEst", "data.frame"))
+  res = data.frame(ids, N, coefs)
+  names(res) = c("id1", "id2", "N", if(param == "kappa") paste0("k", 0:2) else paste0("d", 1:9))
 
   if(maxval) {
     ml = do.call(rbind, lapply(resList, function(r) r$loglik))
     res = cbind(res, maxloglik = ml)
   }
+
+  class(res) = c("ibdEst", class(res))
 
   if(contourPlot) {
     if(param == "delta")
@@ -324,7 +325,7 @@ as.double.ibdEst = function(x, ...) {
 # This function is (optionally) called from within `ibdEstimate()`.
 #' @importFrom stats quantile
 #' @importFrom graphics contour
-contoursKappaML = function(x, ids, peak = NA, levels = NULL) {
+contoursKappaML = function(x, ids, peak = NA, levels = NULL, ...) {
   ids = as.character(ids)
   if(length(ids) != 2)
     stop2("Contour plots require `ids` to be a single pair of individuals")
@@ -369,12 +370,13 @@ contoursKappaML = function(x, ids, peak = NA, levels = NULL) {
     levels = unique.default(round(levs, d+1))
   }
 
-  ribd::ibdTriangle()
+  ribd::ibdTriangle(...)
   contour(k0, k2, z = loglikMat, add = TRUE, levels = levels)
   if(!is.null(peak))
     ribd::showInTriangle(peak, new = FALSE)
 }
 
+# Not used?
 add = function(v, col = 2, pch = 16) points(v[1], v[3], col = col, pch = pch)
 
 

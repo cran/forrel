@@ -31,7 +31,7 @@ character vector of ID labels. Default: All individuals.}
 labels. If NULL, the following are tried in order:
 \itemize{
 \item \code{names(afreq)}
-\item `seq_along(afreq)'
+\item \code{seq_along(afreq)}
 \item \code{1:2} (Fallback if both \code{alleles} and \code{afreq} are NULL.)
 }}
 
@@ -45,9 +45,9 @@ frequencies, possibly named with allele labels.}
 marker object (on which the simulation should be conditioned) or the name
 (or index) of a marker attached to \code{x}.}
 
-\item{loopBreakers}{A numeric containing IDs of individuals to be used as
+\item{loopBreakers}{A vector containing IDs of individuals to be used as
 loop breakers. Relevant only if the pedigree has loops, and only if
-\code{partialmarker} is non-NULL. See \code{\link[pedtools:inbreedingLoops]{pedtools::breakLoops()}}.}
+\code{partialmarker} is non-NULL. See \code{\link[pedtools:breakLoops]{pedtools::breakLoops()}}.}
 
 \item{seed}{An integer seed for the random number generator (optional).}
 
