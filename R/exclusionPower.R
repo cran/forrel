@@ -17,10 +17,13 @@
 #' @param truePed A `ped` object (or a list of such), describing the true
 #'   relationship. ID labels must be consistent with `claimPed`.
 #' @param ids Individuals available for genotyping.
-#' @param markers A vector indicating the names or indices of markers attached
-#'   to the source pedigree. If NULL (default), then all markers attached to the
-#'   source pedigree are used. If `alleles` or `afreq` is non-NULL, then this
-#'   parameter is ignored.
+#' @param markers Marker input. Either:
+#'
+#'   * `NULL` (default): Use all markers attached to the source pedigree.
+#'   * A vector of names or indices selecting attached markers.
+#'   * A named list of frequency vectors, replacing all existing marker data.
+#'
+#'   Ignored if `alleles` or `afreq` is given.
 #' @param source Either "claim" (default) or "true", deciding which pedigree is
 #'   used as source for marker data.
 #' @param disableMutations This parameter determines how mutation models are
@@ -196,6 +199,14 @@ exclusionPower = function(claimPed, truePed, ids, markers = NULL, source = "clai
     hasMut = FALSE
     disableMutations = FALSE # don't do anything
   }
+  else if(is.list(markers)) {
+    .checkFreqDB(markers)
+    claimPed = setMarkers(claimPed, locusAttributes = markers, checkCons = FALSE)
+    truePed = setMarkers(truePed, locusAttributes = markers, checkCons = FALSE)
+    sourcePed = claimPed
+    markers = names(markers)
+    typed = character(0)
+  }
   else {
     sourcePed = switch(source, claim = claimPed, true = truePed,
                        stop2("`source` must be either 'claim' or 'true': ", source))
@@ -213,11 +224,6 @@ exclusionPower = function(claimPed, truePed, ids, markers = NULL, source = "clai
         markers = 1:nmTot
     }
 
-    # Check for already typed members. TODO: Support for partially typed members
-    typed = typedMembers(sourcePed)
-    if(length(bad <- intersect(allids, typed)))
-      stop2("Individual is already genotyped: ", toString(bad))
-
     # Transfer marker data to the other pedigree
     switch(source,
            claim = {
@@ -228,6 +234,10 @@ exclusionPower = function(claimPed, truePed, ids, markers = NULL, source = "clai
              truePed = selectMarkers(truePed, markers)
              claimPed = transferMarkers(from = truePed, to = claimPed)
            })
+
+    typed = typedMembers(truePed)
+    if(length(bad <- intersect(allids, typed)))
+      stop2("Individual is already genotyped: ", bad)
   }
 
   # Plot

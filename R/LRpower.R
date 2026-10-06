@@ -1,33 +1,34 @@
 #' Power simulation for kinship LR
 #'
-#' This function uses simulations to estimate the likelihood ratio (LR)
-#' distribution in a given kinship testing scenario. In the most general
-#' setting, three pedigrees are involved: the two pedigrees being compared, and
-#' the true relationship (which may differ from the other two). A subset of
-#' individuals are available for genotyping. Some individuals may already be
-#' genotyped; all simulations are then conditional on these.
+#' This function uses simulations to estimate the likelihood ratio (LR) distribution in a
+#' given kinship testing scenario. In the most general setting, three pedigrees are
+#' involved: the two pedigrees being compared, and the true relationship (which may differ
+#' from the other two). A subset of individuals are available for genotyping. Some
+#' individuals may already be genotyped; all simulations are then conditional on these.
 #'
 #' @inheritParams exclusionPower
-#' @param numeratorPed,denominatorPed `ped` objects (or lists of such),
-#'   describing the two relationships under comparison.
-#' @param truePed A `ped` object (or a list of such), describing the true
-#'   relationship. By default equal to `numeratorPed`.
+#' @param numeratorPed,denominatorPed `ped` objects (or lists of such), describing the two
+#'   relationships under comparison.
+#' @param truePed A `ped` object (or a list of such), describing the true relationship. By
+#'   default equal to `numeratorPed`.
 #' @param ids Individuals available for genotyping.
-#' @param source Either "true" (default), "numerator" or "denominator",
-#'   indicating which pedigree is used as source for marker data.
+#' @param source Either "true" (default), "numerator" or "denominator", indicating which
+#'   pedigree is used as source for marker data.
 #' @param nsim A positive integer: the number of simulations.
-#' @param threshold A numeric vector with one or more positive numbers used as
-#'   LR thresholds.
+#' @param threshold A numeric vector with one or more positive numbers used as LR
+#'   thresholds.
 #' @param disableMutations Not implemented yet.
 #' @param alleles,afreq,Xchrom If these are given, they are used (together with
 #'   `knownGenotypes`) to create a marker object on the fly.
 #' @param seed An integer seed for the random number generator (optional).
 #'
-#' @return A `LRpowerResult` object, which is essentially a list with the
-#'   following entries:
+#' @return A `LRpowerResult` object, which is essentially a list with the following
+#'   entries:
 #'
 #'   * `LRperSim`: A numeric vector of length `nsim` containing the total LR for
 #'   each simulation.
+#'
+#'   * `log10LRperSim`: Corresponding log10 LRs, calculated before exponentiation.
 #'
 #'   * `meanLRperMarker`: The mean LR per marker, over all simulations.
 #'
@@ -36,11 +37,13 @@
 #'   * `meanLogLR`: The mean total `log10(LR)` over all simulations.
 #'
 #'   * `IP`: A named numeric of the same length as `threshold`. For each element
-#'   of `threshold`, the fraction of simulations resulting in a LR exceeding the
-#'   given number.
+#'   of `threshold`, the fraction of simulations resulting in a LR exceeding the given
+#'   number.
 #'
 #'   * `params`: A list containing the input parameters `markers`, `nsim`,
-#'   `threshold` and `disableMutations`
+#'   `threshold` and `disableMutations`.
+#'
+#' @seealso [LRpowerPlot()]
 #'
 #' @examples
 #'
@@ -87,6 +90,14 @@ LRpower = function(numeratorPed, denominatorPed, truePed = numeratorPed, ids, ma
                    alleles = NULL, afreq = NULL, Xchrom = FALSE, knownGenotypes = NULL,
                    plot = FALSE, plotMarkers = NULL, seed = NULL, verbose = TRUE) {
   st = Sys.time()
+
+  if(!is.ped(numeratorPed) && !is.pedList(numeratorPed))
+    stop2("Expected `numeratorPed` to be a pedigree, but received: ", class(numeratorPed)[1])
+  if(!is.ped(denominatorPed) && !is.pedList(denominatorPed))
+    stop2("Expected `denominatorPed` to be a pedigree, but received: ", class(denominatorPed)[1])
+  if(!is.ped(truePed) && !is.pedList(truePed))
+    stop2("Expected `truePed` to be a pedigree, but received: ", class(truePed)[1])
+
   if(is.list(ids)) {
     ids = lapply(ids, as.character)
     allids = unique.default(unlist(ids))
@@ -123,6 +134,14 @@ LRpower = function(numeratorPed, denominatorPed, truePed = numeratorPed, ids, ma
     typed = typedMembers(truePed)
     disableMutations = FALSE # don't do anything
   }
+  else if(is.list(markers)) {
+    .checkFreqDB(markers)
+    numeratorPed = setMarkers(numeratorPed, locusAttributes = markers, checkCons = FALSE)
+    denominatorPed = setMarkers(denominatorPed, locusAttributes = markers, checkCons = FALSE)
+    truePed = setMarkers(truePed, locusAttributes = markers, checkCons = FALSE)
+    markers = names(markers)
+    typed = character(0)
+  }
   else {
     source = match.arg(source, c("true", "numerator", "denominator"))
     sourcePed = switch(source, true = truePed, numerator = numeratorPed, denominator = denominatorPed,
@@ -141,12 +160,6 @@ LRpower = function(numeratorPed, denominatorPed, truePed = numeratorPed, ids, ma
         markers = 1:nmTot
     }
 
-    # Check for already typed members.
-    # TODO (minor): Support for partially typed members
-    typed = typedMembers(sourcePed)
-    if(length(bad <- intersect(allids, typed)))
-      stop2("Individual is already genotyped: ", toString(bad))
-
     # Select markers from source and transfer to truePed (if necessary)
     truePed = switch(source,
        true = selectMarkers(truePed, markers),
@@ -154,6 +167,11 @@ LRpower = function(numeratorPed, denominatorPed, truePed = numeratorPed, ids, ma
                                    to = truePed),
        denominator = transferMarkers(from = selectMarkers(denominatorPed, markers),
                                      to = truePed))
+
+    # Check for already typed members
+    typed = typedMembers(truePed)
+    if(length(bad <- intersect(allids, typed)))
+      stop2("Individual is already genotyped: ", bad)
   }
 
   # Plot
@@ -190,7 +208,7 @@ LRpower = function(numeratorPed, denominatorPed, truePed = numeratorPed, ids, ma
 
   # Simulate nsim complete profiles from truePed
   if(verbose)
-    message(sprintf("Simulating %d profile%s from the true pedigree ...\n",
+    message(sprintf("Simulating %d profile%s from the true pedigree...",
                     nsim, pluralise(nsim)),
             appendLF = FALSE)
 
@@ -222,7 +240,7 @@ LRpower = function(numeratorPed, denominatorPed, truePed = numeratorPed, ids, ma
 lrPowerCompute = function(sims, numeratorPed, denominatorPed, ids, params, verbose = TRUE) {
 
   if(verbose)
-    message(sprintf("Computing LR distribution for individual%s %s ... ",
+    message(sprintf("Computing LR distribution for individual%s %s...",
                     pluralise(length(ids)), toString(ids)), appendLF = FALSE)
 
   markers = params$markers
@@ -238,7 +256,7 @@ lrPowerCompute = function(sims, numeratorPed, denominatorPed, ids, params, verbo
     denomSim = transferMarkers(from = s, to = denominatorPed, ids = targetsIds)
     #print(numerSim);print(denomSim)
     lr = kinshipLR(list(numerSim, denomSim), ref = 2)
-    lr$LRperMarker[,1]
+    lr$lnLRperMarker[, 1] / log(10)
   }, FUN.VALUE = numeric(length(markers)))
 
   # Ensure matrix
@@ -251,17 +269,19 @@ lrPowerCompute = function(sims, numeratorPed, denominatorPed, ids, params, verbo
     message("done")
 
   # Results
-  LRperSim = apply(lrs, 2, prod)
-  meanLRperMarker = apply(lrs, 1, mean)
+  log10LRperSim = colSums(lrs)
+  LRperSim = 10^log10LRperSim
+  meanLRperMarker = rowMeans(10^lrs)
   meanLR = mean(LRperSim)
-  meanLogLR = mean(log10(LRperSim))
-  IP = sapply(threshold, function(thr) mean(LRperSim >= thr))
+  meanLogLR = mean(log10LRperSim)
+  IP = sapply(threshold, function(thr) mean(log10LRperSim >= log10(thr)))
   names(IP) = threshold
 
   params$ids = ids
   structure(list(LRperSim = LRperSim, meanLRperMarker = meanLRperMarker,
                  meanLR = meanLR, meanLogLR = meanLogLR, IP = IP,
-                 params = params), class = "LRpowerResult")
+                 params = params, log10LRperSim = log10LRperSim),
+            class = "LRpowerResult")
 
 }
 

@@ -25,26 +25,30 @@ LRpower(
 )
 }
 \arguments{
-\item{numeratorPed, denominatorPed}{\code{ped} objects (or lists of such),
-describing the two relationships under comparison.}
+\item{numeratorPed, denominatorPed}{\code{ped} objects (or lists of such), describing the two
+relationships under comparison.}
 
-\item{truePed}{A \code{ped} object (or a list of such), describing the true
-relationship. By default equal to \code{numeratorPed}.}
+\item{truePed}{A \code{ped} object (or a list of such), describing the true relationship. By
+default equal to \code{numeratorPed}.}
 
 \item{ids}{Individuals available for genotyping.}
 
-\item{markers}{A vector indicating the names or indices of markers attached
-to the source pedigree. If NULL (default), then all markers attached to the
-source pedigree are used. If \code{alleles} or \code{afreq} is non-NULL, then this
-parameter is ignored.}
+\item{markers}{Marker input. Either:
+\itemize{
+\item \code{NULL} (default): Use all markers attached to the source pedigree.
+\item A vector of names or indices selecting attached markers.
+\item A named list of frequency vectors, replacing all existing marker data.
+}
 
-\item{source}{Either "true" (default), "numerator" or "denominator",
-indicating which pedigree is used as source for marker data.}
+Ignored if \code{alleles} or \code{afreq} is given.}
+
+\item{source}{Either "true" (default), "numerator" or "denominator", indicating which
+pedigree is used as source for marker data.}
 
 \item{nsim}{A positive integer: the number of simulations.}
 
-\item{threshold}{A numeric vector with one or more positive numbers used as
-LR thresholds.}
+\item{threshold}{A numeric vector with one or more positive numbers used as LR
+thresholds.}
 
 \item{disableMutations}{Not implemented yet.}
 
@@ -66,28 +70,28 @@ be included in the plot.}
 \item{verbose}{A logical.}
 }
 \value{
-A \code{LRpowerResult} object, which is essentially a list with the
-following entries:
+A \code{LRpowerResult} object, which is essentially a list with the following
+entries:
 \itemize{
 \item \code{LRperSim}: A numeric vector of length \code{nsim} containing the total LR for
 each simulation.
+\item \code{log10LRperSim}: Corresponding log10 LRs, calculated before exponentiation.
 \item \code{meanLRperMarker}: The mean LR per marker, over all simulations.
 \item \code{meanLR}: The mean total LR over all simulations.
 \item \code{meanLogLR}: The mean total \code{log10(LR)} over all simulations.
 \item \code{IP}: A named numeric of the same length as \code{threshold}. For each element
-of \code{threshold}, the fraction of simulations resulting in a LR exceeding the
-given number.
+of \code{threshold}, the fraction of simulations resulting in a LR exceeding the given
+number.
 \item \code{params}: A list containing the input parameters \code{markers}, \code{nsim},
-\code{threshold} and \code{disableMutations}
+\code{threshold} and \code{disableMutations}.
 }
 }
 \description{
-This function uses simulations to estimate the likelihood ratio (LR)
-distribution in a given kinship testing scenario. In the most general
-setting, three pedigrees are involved: the two pedigrees being compared, and
-the true relationship (which may differ from the other two). A subset of
-individuals are available for genotyping. Some individuals may already be
-genotyped; all simulations are then conditional on these.
+This function uses simulations to estimate the likelihood ratio (LR) distribution in a
+given kinship testing scenario. In the most general setting, three pedigrees are
+involved: the two pedigrees being compared, and the true relationship (which may differ
+from the other two). A subset of individuals are available for genotyping. Some
+individuals may already be genotyped; all simulations are then conditional on these.
 }
 \examples{
 
@@ -128,4 +132,7 @@ pow3 = LRpower(claim, unrel, truth2, ids = ids, nsim = nsim,
 pow3
 }
 
+}
+\seealso{
+\code{\link[=LRpowerPlot]{LRpowerPlot()}}
 }

@@ -167,14 +167,20 @@ fixAllelesAndFreqs = function(alleles = NULL, afreq = NULL,
 }
 
 
-# TODO: Remove the following
+.checkFreqDB = function(db) {
+  nms = names(db)
+  if(is.null(nms) || anyNA(nms) || any(!nzchar(nms)))
+    stop2("Marker names are missing")
+  if(dup <- anyDuplicated(nms))
+    stop2("Duplicated marker name: ", nms[dup])
 
-#' Add points to the IBD triangle
-#'
-#' This function is re-exported from the `ribd` package. For documentation see
-#' [ribd::showInTriangle()].
-#'
-#' @importFrom ribd showInTriangle
-#' @name showInTriangle
-#' @export
-NULL
+  ok = vapply(db, function(m)
+    is.numeric(m) && all(is.finite(m)) && all(m >= 0) && abs(sum(m) - 1) < 1e-8,
+    logical(1))
+
+  if(!all(ok))
+    stop2("Invalid frequency vector: ", toString(nms[!ok]))
+
+  invisible(TRUE)
+}
+

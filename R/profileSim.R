@@ -104,22 +104,13 @@ profileSim = function(x, N = 1, ids = NULL, markers = NULL, loopBreakers = NULL,
 
     # If `markers` is a list of frequency vectors, attach as new markers
     if(is.list(markers)) {
-      nms = names(markers)
-      if(is.null(nms) || anyNA(nms) || any(!nzchar(nms)))
-        stop2("`markers` appears to be a list of frequency vectors, but marker names are missing")
-      if(dup <- anyDuplicated(nms))
-        stop2("Duplicated marker name: ", nms[dup])
-
-      checks = .checkFreqs(markers)
-      if(!all(checks))
-        stop2("`markers` appears to be a list of frequency vectors, but some entries are invalid: ",
-              nms[!checks])
-
+      .checkFreqDB(markers)
       x = setMarkers(x, locusAttributes = markers, checkCons = FALSE)
+      if(verbose)
+        message(sprintf("Attached frequency database (%d markers)", length(markers)))
+
       markers = NULL
       newdb = TRUE
-      if(verbose)
-        message(sprintf("Attached %d markers based on frequency database", length(nms)))
     }
     else {
       x = selectMarkers(x, markers)
@@ -235,10 +226,6 @@ profileSim = function(x, N = 1, ids = NULL, markers = NULL, loopBreakers = NULL,
   sims
 }
 
-.checkFreqs = function(db) {
-  vapply(db, FUN.VALUE = TRUE, USE.NAMES = FALSE, function(m)
-    is.numeric(m) && all(is.finite(m)) && all(m >= 0) && abs(sum(m) - 1) < 1e-8)
-}
 
 .profileSimMarker = function(j, x, N, ids, lb = NULL)
   markerSim(x, N, ids = ids, partialmarker = j, loopBreakers = lb, verbose = FALSE)
